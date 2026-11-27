@@ -50,7 +50,8 @@ function stateFor(session,url){
   return { profile:session.profile?profileFor(session):null, selected, terminal, terminals:[{id:'pnc',name:'부산신항'}, {id:'pnit',name:'부산북항'}], calls:calls.filter(c=>c.terminal===terminal), room:selected?roomFor(session,selected.id):{participants:0,pushes:0,pulls:0,peers:[],recent:[]}, wishes:wishes.filter(w=>w.callId===selected?.id), nearby:[], changes:[], confirmedDepartures:[], weather:{code:'clear'}, source:{kind:'demo',stale:false}, online:peers.length+1 };
 }
 function sendStatic(req,res){
-  const pathname=decodeURIComponent(new URL(req.url,'http://localhost').pathname);
+  let pathname=decodeURIComponent(new URL(req.url,'http://localhost').pathname);
+  if(pathname==='/favicon.ico')pathname='/favicon.svg';
   const relative=pathname==='/'?'index.html':pathname.replace(/^\/+/, '');
   const file=path.resolve(ROOT,relative);
   if(!file.startsWith(ROOT+path.sep) && file!==path.join(ROOT,'index.html')) return json(res,403,{error:'접근할 수 없습니다.'});
