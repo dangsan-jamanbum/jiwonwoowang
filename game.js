@@ -191,6 +191,7 @@ function encounter(id=nearby){
    world?.watchShark?.();focusWorld();return;
  }
  if(id==='eomuk'){
+   if(world?.interactSharkAtStall?.()){focusWorld();return;}
    if(world?.eatFishcake?.())presence?.wake();
    focusWorld();return;
  }
