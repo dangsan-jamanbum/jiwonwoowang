@@ -162,3 +162,20 @@
 4. 직접 화물 운반, 운반 중 감속, 지게차와 컨테이너 캐리어 기능은 아직 구현하지 않았습니다.
 
 다음 단계는 브라우저에서 GitHub Pages 실행 결과와 콘솔 오류를 확인하고, 3D 모듈의 인터페이스 오류를 수정한 뒤, 화물 운반 기능을 월드에 추가하는 것입니다.
+
+
+## 2026-11-27 Render 서버 1차 구성
+
+사용자가 새 Render 서비스를 만들어도 된다고 승인하여, 기존 서비스와 분리된 `jiwonwoowang` 전용 Node.js 서버를 저장소에 추가했습니다.
+
+- `server.js`: 게임 정적 파일 제공 및 `/api/state`, `/api/terminal-board`, `/api/guest`, `/api/profile`, `/api/join`, `/api/favorite`, `/api/wish`, `/api/action`, `/api/chat`, `/api/presence` 기본 경로
+- `package.json`: `npm start` 실행 스크립트
+- `render.yaml`: Render 무료 Node.js Web Service Blueprint 설정
+- `RENDER_SETUP.md`: 새 Render 서비스 생성 순서와 현재 제한 사항
+
+중요한 제한:
+- 현재 선박 항차는 실제 부산항 일정이 아니라 연결 확인용 예시 데이터입니다.
+- 서버 데이터는 메모리에만 저장되므로 인스턴스 재시작 시 초기화됩니다.
+- 위치 동기화는 기초 폴링 방식이며 실제 다중 브라우저 테스트가 필요합니다.
+- Render 서비스는 저장소 파일만 추가했다고 자동 생성되지 않습니다. Render 대시보드에서 Blueprint 생성 및 Apply가 한 번 필요합니다.
+- 브라우저 실행·배포 검증은 아직 완료되지 않았습니다.
