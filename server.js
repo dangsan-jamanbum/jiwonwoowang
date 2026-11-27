@@ -168,6 +168,7 @@ const server=http.createServer(async(req,res)=>{
       return json(res,200,{terminal,calls:rows,yardTrucks:[],source,delayDays:rows.length?(delayByCall.get(rows[0].id)||0):0,delayEvents:cargoEvents.filter(e=>rows.some(c=>c.id===e.callId)).slice(-4).reverse()});
     }
     if(req.method==='GET' && route==='cargo'){
+      await getPncSchedule();
       const callId=url.searchParams.get('call')||stateForCallId(url);
       return json(res,200,{selfId:session.id,items:cargoItems.filter(v=>!v.delivered),delayDays:delayByCall.get(callId)||0,events:cargoEvents.filter(e=>e.callId===callId).slice(-8).reverse()});
     }
