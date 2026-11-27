@@ -728,6 +728,25 @@ export function mountWalk3D(container, options={}) {
     const front=spot.front||courtFront;
     return (p.x-spot.x)*front.x+(p.z-spot.z)*front.z>1.25&&distance(p,spot)<5.45;
   }
+  function nextToShrine(){
+    let nearest=null,best=Infinity;
+    const consider=(kind,id,point)=>{
+      const d=distance(player,point);
+      if(d<best){best=d;nearest={kind,id};}
+    };
+    for(const [id,wish] of Object.entries(court.wishEntries||{})){
+      const radius=wish.radius||2.3;
+      if(distance(player,wish)<=radius)consider('wish',id,wish);
+    }
+    for(const spot of court.spots||[]){
+      if(guardianFront(player,spot))consider('guardian',spot.id,spot);
+    }
+    const shrine=zones.shrine;
+    if(shrine&&distance(player,shrine)<=(shrine.radius||3.8)){
+      consider('court','court',shrine);
+    }
+    return nearest;
+  }
   const atCourt=(p)=>canWalk(p.x,p.z)&&(distance(p,zones.shrine)<zones.shrine.radius || court.spots.some(s=>guardianFront(p,s)));
   const canCheerHere=()=>!!(active&&!disposed&&!gestureLocked()&&!aligning&&atCourt(player));
   async function approachGuardian(id) {
