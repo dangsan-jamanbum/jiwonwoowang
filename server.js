@@ -10,9 +10,9 @@ const presence = new Map();
 const chats = [];
 const wishes = [];
 const cargoItems = [
-  {id:'cargo-pnc-001',name:'수출 컨테이너 화물',x:-7.3,z:-55.6,yaw:0,carrierId:null,delivered:false},
-  {id:'cargo-pnc-002',name:'팔레트 화물',x:-9.5,z:-55.1,yaw:.18,carrierId:null,delivered:false},
-  {id:'cargo-pnc-003',name:'목재 포장 화물',x:-5.1,z:-55.1,yaw:-.18,carrierId:null,delivered:false}
+  {id:'cargo-pnc-001',kind:'weather',name:'기상 재해 긴급 대응',x:-7.3,z:-55.6,yaw:0,carrierId:null,delivered:false},
+  {id:'cargo-pnc-002',kind:'crew',name:'긴급 작업 인원 파견',x:-9.5,z:-55.1,yaw:.18,carrierId:null,delivered:false},
+  {id:'cargo-pnc-003',kind:'equipment',name:'항만 복구 장비 지원',x:-5.1,z:-55.1,yaw:-.18,carrierId:null,delivered:false}
 ];
 const delayByCall = new Map();
 const cargoEvents = [];
