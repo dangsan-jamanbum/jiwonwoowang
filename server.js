@@ -44,7 +44,7 @@ function parsePncSchedule(html){
     const code=route.split('/').pop().trim().toUpperCase();
     found.push({
       id:'pnc-'+match[1].toLowerCase(),terminal:'pnc',name,voy:match[1],outboundVoy:match[1],inboundVoy:match[1],carrierVoy:match[1],
-      berth:'PNC 선석 배정',berthPhase:code==='S'?'berthed':'planned',etb:null,etd:null,atd:null,atdVerified:false,isDemo:false,
+      berth:'PNC 선석 배정',berthPhase:'planned',etb:null,etd:null,atd:null,atdVerified:false,isDemo:false,
       operator:route.split('/')[0]||'',route:route.split('/').slice(1,-1).join('/')||'',scheduleCode:code,
       loading:{plan:load,completed:null,remainingVan:null,discharge,shift,yard,workTotal:(discharge??0)+(load??0)}
     });
