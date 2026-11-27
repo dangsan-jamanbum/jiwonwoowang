@@ -277,13 +277,26 @@ function addEomuk(k,holder){
 }
 
 function dressHonghong(k,chest,coat){
-  const {rings,tube,orb}=k;
+  const {T,rings,tube,orb,mesh}=k;
   // A soft, ankle-length thobe with a rounded, gently protruding belly.
   rings(chest,[[-.735,.255,.174,-.012],[-.700,.285,.190,-.010],[-.560,.310,.207,-.008],[-.360,.342,.232,-.006],[-.150,.382,.258,-.004],[.035,.405,.274,-.002],[.205,.389,.258,0],[.365,.344,.218,0],[.500,.292,.170,0],[.590,.205,.122,0],[.650,.105,.088,0]],coat,0,0,0,40);
-  // A restrained front placket and collar keep the robe readable at game scale.
   tube(chest,[[0,.605,.128],[0,.485,.179],[0,.300,.254],[0,.080,.274],[0,-.180,.258],[0,-.440,.230],[0,-.680,.190]],.006,'#e7e3dc',24);
   orb(chest,0,.525,.176,.018,.018,.008,'#d7d1c8');
   orb(chest,0,.445,.192,.012,.012,.006,'#d7d1c8');
+  // Print the requested name directly onto the front of the white thobe.
+  const canvas=document.createElement('canvas');canvas.width=512;canvas.height=256;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,512,256);
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.font='bold 132px sans-serif';
+  ctx.lineJoin='round';ctx.lineWidth=13;ctx.strokeStyle='rgba(255,255,255,.96)';
+  ctx.strokeText('홍홍',256,128);
+  ctx.fillStyle='#9e2632';ctx.fillText('홍홍',256,128);
+  const texture=new T.CanvasTexture(canvas);texture.colorSpace=T.SRGBColorSpace;
+  const material=new T.MeshBasicMaterial({map:texture,transparent:true,side:T.DoubleSide,depthWrite:false,toneMapped:false});
+  const lettering=mesh(chest,new T.PlaneGeometry(.255,.128),material,0,.105,.283);
+  lettering.userData.preserveMaterial=true;
+  lettering.castShadow=false;lettering.receiveShadow=false;
 }
 
 function buildRig(T,style,guardian){
@@ -302,27 +315,41 @@ function buildRig(T,style,guardian){
   const eyes=g?guardianFace(k,head,theme,g):face(k,head,theme);
   if(!g){
     if(h){
-      // Dark, tidy side hair beneath a soft red-and-white checked ghutra.
-      orb(head,0,.115,-.117,.298,.275,.249,'#292522');
-      for(const side of [-1,1]){
-        lock(head,[[side*.30,.24,.015],[side*.36,.06,.005],[side*.37,-.16,-.025],[side*.32,-.38,-.035]],.105,.045,'#fffdf8');
-        lock(head,[[side*.24,.20,-.12],[side*.29,-.01,-.23],[side*.27,-.23,-.25],[side*.23,-.43,-.17]],.090,.035,'#fffdf8');
-        // Small red woven accents on the hanging scarf edges.
-        tube(head,[[side*.31,.10,.015],[side*.35,-.08,-.005],[side*.35,-.24,-.025]],.009,'#c94a4c',12);
+      // The hair is intentionally not built: the ghutra fully covers the crown,
+      // nape and rear shoulders without stray locks or horn-like side pieces.
+      const crown=mesh(head,new T.SphereGeometry(1,32,24),'#fffdf8',0,.205,-.012);
+      crown.scale.set(.366,.252,.346);
+      const clothGeo=new T.BufferGeometry(),positions=[],indices=[];
+      const columns=48,rows=14,start=.57,end=Math.PI*2-.57;
+      for(let row=0;row<=rows;row++){
+        const v=row/rows;
+        for(let col=0;col<=columns;col++){
+          const a=start+(end-start)*col/columns;
+          const back=Math.max(0,(1-Math.cos(a))*.5);
+          const y=.365-v*(.60*back+.235*(1-back));
+          const rx=.365+v*(.17*back+.018*(1-back));
+          const rz=.344+v*(.035*back);
+          const x=Math.sin(a)*rx;
+          const z=-.012+Math.cos(a)*rz;
+          positions.push(x,y,z);
+          if(row&&col){
+            const q=row*(columns+1)+col;
+            indices.push(q-columns-2,q-1,q,q-columns-2,q,q-columns-1);
+          }
+        }
       }
-      const crown=mesh(head,new T.SphereGeometry(1,24,16),'#fffdf8',0,.205,-.015);
-      crown.scale.set(.365,.245,.345);
-      // A dark agal sits over the scarf; the red forehead band remains visible.
-      const agal=mesh(head,new T.TorusGeometry(.337,.031,8,40),'#292725',0,.302,-.012);
-      agal.rotation.x=Math.PI/2;agal.scale.set(1,.92,1);
-      const band=group(head,0,.226,.286);
-      rect(band,0,0,0,.625,.084,.026,.018,'#c92535');
-      const canvas=document.createElement('canvas');canvas.width=512;canvas.height=128;
-      const ctx=canvas.getContext('2d');ctx.clearRect(0,0,512,128);
-      ctx.fillStyle='#fff8ef';ctx.font='bold 92px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('홍홍',256,66);
-      const texture=new T.CanvasTexture(canvas);texture.colorSpace=T.SRGBColorSpace;
-      const textMaterial=new T.MeshBasicMaterial({map:texture,transparent:true,side:T.DoubleSide,depthWrite:false});
-      const lettering=mesh(band,new T.PlaneGeometry(.43,.078),textMaterial,0,0,.016);
+      clothGeo.setAttribute('position',new T.Float32BufferAttribute(positions,3));
+      clothGeo.setIndex(indices);clothGeo.computeVertexNormals();
+      const drape=mesh(head,clothGeo,'#fffdf8');drape.name='honghong-single-ghutra-drape';
+      // Fine red piping traces the two visible falling edges of the cloth.
+      for(const side of [-1,1]){
+        tube(head,[[side*.195,.315,.285],[side*.275,.12,.265],[side*.355,-.10,.245],[side*.465,-.30,.205]],.0065,'#c94a4c',18);
+      }
+      // A thin, circular red headband hugs the head; no projecting front bar.
+      const redBand=mesh(head,new T.TorusGeometry(.337,.014,10,64),'#b92735',0,.245,-.010);
+      redBand.rotation.x=Math.PI/2;redBand.scale.set(1,.94,1);
+      const agal=mesh(head,new T.TorusGeometry(.341,.017,10,64),'#292725',0,.278,-.010);
+      agal.rotation.x=Math.PI/2;agal.scale.set(1,.94,1);
       for(const side of [-1,1]){
         const lens=mesh(head,new T.TorusGeometry(.073,.008,7,20),'#39332f',side*.137,-.005,.340);
         lens.scale.set(1,.82,1);
@@ -811,6 +838,9 @@ function batchRig(T,r){
     function walk(obj){
       if(keep.has(obj))return;
       if(obj.isMesh){
+        // Keep CanvasTexture meshes as independent materials; vertex-color batching
+        // would otherwise discard their map.
+        if(obj.userData.preserveMaterial)return;
         const batch=r.k.paintBatch(obj.material.roughness),color=obj.material.color;let b=buckets.get(batch);if(!b){b={pos:[],nor:[],colors:[],ix:[]};buckets.set(batch,b);}
         m.multiplyMatrices(inv,obj.matrixWorld);nm.getNormalMatrix(m);
         const pos=obj.geometry.getAttribute('position'),norm=obj.geometry.getAttribute('normal'),vc=obj.geometry.getAttribute('color'),base=b.pos.length/3;
@@ -819,7 +849,7 @@ function batchRig(T,r){
       }
       for(const child of obj.children)walk(child);
     }
-    for(const child of [...joint.children])if(!keep.has(child)){walk(child);rem.push(child);}
+    for(const child of [...joint.children])if(!keep.has(child)){if(child.isMesh&&child.userData.preserveMaterial)continue;walk(child);rem.push(child);}
     for(const child of rem)joint.remove(child);
     for(const [material,b] of buckets){
       const geo=new T.BufferGeometry();if(joint.name==='worker-face-surface'||joint.name==='cigarette'||joint.name==='folded-eomuk')geo.userData.preserveTopology=true;geo.setAttribute('position',new T.Float32BufferAttribute(b.pos,3));geo.setAttribute('normal',new T.Float32BufferAttribute(b.nor,3));geo.setAttribute('color',new T.Float32BufferAttribute(b.colors,3));geo.setIndex(b.ix);geo.computeBoundingSphere();
