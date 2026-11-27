@@ -450,7 +450,8 @@ const server=http.createServer(async(req,res)=>{
         return json(res,200,{ok:true});
       }
       if(route==='fishing'){
-        if(body.mode==='catch')sashimiPlateFull=true;
+        if(body.mode==='cooked')sashimiPlateFull=true;
+        if(body.mode==='eaten')sashimiPlateFull=false;
         return json(res,200,{ok:true,sashimiPlateFull});
       }
       if(route==='cargo'){
