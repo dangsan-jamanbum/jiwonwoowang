@@ -291,12 +291,60 @@ export function mountWalk3D(container, options={}) {
   const cargoVisuals=new Map();
   let cargoItems=Array.isArray(options.cargoItems)?options.cargoItems.map(v=>({...v})):[],cargoSelfId=options.cargoSelfId||options.getSelfId?.()||null;
   let carriedCargoId=cargoItems.find(v=>v.carrierId===cargoSelfId)?.id||null;
-  const cargoBoxGeo=new THREE.BoxGeometry(.78,.62,.62),cargoBandGeo=new THREE.BoxGeometry(.80,.075,.66);
-  const cargoWood=new THREE.MeshStandardMaterial({color:0xb77b43,roughness:.88}),cargoBand=new THREE.MeshStandardMaterial({color:0x394a50,metalness:.48,roughness:.55});
-  function makeCargoVisual(){
-    const g=new THREE.Group();g.name='직접 운반 화물';
-    const box=new THREE.Mesh(cargoBoxGeo,cargoWood);box.position.y=.36;box.castShadow=true;box.receiveShadow=true;g.add(box);
-    for(const y of [.18,.53]){const band=new THREE.Mesh(cargoBandGeo,cargoBand);band.position.y=y;band.castShadow=true;g.add(band);}
+  const cargoMaterials={
+    cloud:new THREE.MeshStandardMaterial({color:0x394654,roughness:.92}),
+    cloudLight:new THREE.MeshStandardMaterial({color:0x8798a2,roughness:.86}),
+    lightning:new THREE.MeshStandardMaterial({color:0xffd34e,emissive:0xffa900,emissiveIntensity:1.25,roughness:.4}),
+    workerClothes:new THREE.MeshStandardMaterial({color:0xf2a52e,roughness:.82}),
+    workerVest:new THREE.MeshStandardMaterial({color:0xffdf72,roughness:.78}),
+    workerSkin:new THREE.MeshStandardMaterial({color:0xd69a70,roughness:.9}),
+    workerPants:new THREE.MeshStandardMaterial({color:0x344d60,roughness:.9}),
+    helmet:new THREE.MeshStandardMaterial({color:0xf5d34f,roughness:.68}),
+    equipment:new THREE.MeshStandardMaterial({color:0x477c83,metalness:.35,roughness:.62}),
+    equipmentMetal:new THREE.MeshStandardMaterial({color:0xb8c3c1,metalness:.72,roughness:.38}),
+    beacon:new THREE.MeshStandardMaterial({color:0xe45b42,emissive:0x7d170c,emissiveIntensity:.45})
+  };
+  function cargoPart(parent,geometry,material,x,y,z,sx=1,sy=1,sz=1){
+    const mesh=new THREE.Mesh(geometry,material);mesh.position.set(x,y,z);mesh.scale.set(sx,sy,sz);
+    mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;
+  }
+  function makeCargoVisual(item){
+    const g=new THREE.Group();g.name='지연 상쇄 현장 지원 모형';
+    const kind=item.kind||(/weather|storm|재해|기상/i.test(item.id+' '+item.name)?'weather':/crew|worker|인원|작업/i.test(item.id+' '+item.name)?'crew':'equipment');
+    if(kind==='weather'){
+      const cloud=new THREE.Group();g.add(cloud);
+      cargoPart(cloud,new THREE.SphereGeometry(.34,14,10),cargoMaterials.cloud,-.25,.65,0,1.12,.82,.92);
+      cargoPart(cloud,new THREE.SphereGeometry(.40,14,10),cargoMaterials.cloud,0,.72,0,1.05,.88,1);
+      cargoPart(cloud,new THREE.SphereGeometry(.30,14,10),cargoMaterials.cloud,.29,.63,0,1.1,.82,.92);
+      cargoPart(cloud,new THREE.SphereGeometry(.22,12,8),cargoMaterials.cloudLight,-.04,.88,-.015,1.15,.62,.9);
+      const bolt=new THREE.Shape();bolt.moveTo(.10,.48);bolt.lineTo(-.12,.08);bolt.lineTo(.03,.08);bolt.lineTo(-.08,-.30);bolt.lineTo(.25,.14);bolt.lineTo(.09,.14);bolt.closePath();
+      const lightning=new THREE.Mesh(new THREE.ShapeGeometry(bolt),cargoMaterials.lightning);
+      lightning.position.set(.08,.26,.25);lightning.scale.set(.9,.9,.5);lightning.castShadow=true;g.add(lightning);
+      cargoPart(g,new THREE.SphereGeometry(.045,8,6),cargoMaterials.lightning,-.43,.28,.16);
+      cargoPart(g,new THREE.SphereGeometry(.045,8,6),cargoMaterials.lightning,.43,.30,.14);
+    }else if(kind==='crew'){
+      const people=[[-.34,-.20],[0,-.26],[.34,-.18],[-.17,.22],[.19,.24]];
+      for(const [x,z] of people){
+        const person=new THREE.Group();person.position.set(x,0,z);g.add(person);
+        cargoPart(person,new THREE.CylinderGeometry(.105,.12,.30,8),cargoMaterials.workerClothes,0,.39,0);
+        cargoPart(person,new THREE.BoxGeometry(.19,.10,.13),cargoMaterials.workerVest,0,.43,.012);
+        cargoPart(person,new THREE.SphereGeometry(.085,10,8),cargoMaterials.workerSkin,0,.62,0);
+        cargoPart(person,new THREE.SphereGeometry(.105,10,6,0,Math.PI*2,0,Math.PI/2),cargoMaterials.helmet,0,.69,0,1,1,.9);
+        for(const side of [-1,1]){
+          cargoPart(person,new THREE.CylinderGeometry(.035,.04,.24,7),cargoMaterials.workerPants,side*.055,.15,0);
+          cargoPart(person,new THREE.CylinderGeometry(.027,.03,.20,7),cargoMaterials.workerClothes,side*.14,.40,0);
+        }
+      }
+      cargoPart(g,new THREE.CylinderGeometry(.52,.52,.045,18),cargoMaterials.equipment,-.02,.025,0,1,.7,.72);
+    }else{
+      cargoPart(g,new THREE.BoxGeometry(.76,.42,.52),cargoMaterials.equipment,0,.29,0);
+      cargoPart(g,new THREE.BoxGeometry(.80,.08,.56),cargoMaterials.equipmentMetal,0,.53,0);
+      cargoPart(g,new THREE.CylinderGeometry(.19,.19,.10,16),cargoMaterials.equipmentMetal,-.28,.61,0,1,1,.34);
+      cargoPart(g,new THREE.CylinderGeometry(.19,.19,.10,16),cargoMaterials.equipmentMetal,.28,.61,0,1,1,.34);
+      cargoPart(g,new THREE.CylinderGeometry(.07,.07,.10,10),cargoMaterials.beacon,0,.66,-.12);
+      for(const x of [-.25,.25])for(const z of [-.18,.18])
+        cargoPart(g,new THREE.CylinderGeometry(.07,.07,.07,10),cargoMaterials.cloud,x,.07,z);
+    }
     return g;
   }
   function syncCargoVisuals(){
@@ -304,7 +352,7 @@ export function mountWalk3D(container, options={}) {
     for(const item of cargoItems){
       if(!item?.id||item.delivered)continue;
       let visual=cargoVisuals.get(item.id);
-      if(!visual){visual=makeCargoVisual();cargoVisuals.set(item.id,visual);}
+      if(!visual){visual=makeCargoVisual(item);cargoVisuals.set(item.id,visual);}
       let parent=null;
       if(item.carrierId)parent=item.carrierId===cargoSelfId?local.group:peers.get(item.carrierId)?.fig.group||null;
       if(parent){
@@ -1384,5 +1432,5 @@ export function mountWalk3D(container, options={}) {
   on(canvas,'webglcontextlost',e=>{e.preventDefault();if(!disposed)options.onHint?.('3D 화면 연결을 복구하고 있어요.');});
   joystick.style.display=active&&touchDevice?'flex':'none';local.group.position.copy(player);local.group.rotation.y=heading;
   bindVessels();updateShadow(local);adjustView(1);frame=requestAnimationFrame(tick);
-  return {available:true,renderer:software?'canvas3d':'webgl',getZonePosition:id=>zones[id],getNearbyShrine:()=>nearbyShrine,watchShark,getPresence,setLivePeers,goToPeer,goTo,goToWish,actAtDock,act,smoke,eatFishcake,toggleSeat,sitAt,standUp,getSeatState,cheer,sayChat,canCheerHere,approachGuardian,interactNearShrine,home,zoomBy,setActive,setProfile,setPeers,setNeighbors,setVessel,bindVessels,setBoard:state=>marquee.setBoard(state),setDepartures:(calls,terminal)=>office.setDepartures(calls,terminal),replayDeparture:()=>office.replay(),setWishes:(call,wishes)=>court.setWishes(call,wishes),setWeather,setLight,celebrate,setCargo,dispose,destroy:dispose};
+  return {available:true,renderer:software?'canvas3d':'webgl',getZonePosition:id=>zones[id],getNearbyShrine:()=>nearbyShrine,watchShark,getPresence,setLivePeers,goToPeer,goTo,goToWish,actAtDock,act,smoke,eatFishcake,toggleSeat,sitAt,standUp,getSeatState,cheer,sayChat,canCheerHere,approachGuardian,interactNearShrine,hasCargoInteraction:()=>Boolean(carriedCargoId||nearestCargo()),interactCargo,home,zoomBy,setActive,setProfile,setPeers,setNeighbors,setVessel,bindVessels,setBoard:state=>marquee.setBoard(state),setDepartures:(calls,terminal)=>office.setDepartures(calls,terminal),replayDeparture:()=>office.replay(),setWishes:(call,wishes)=>court.setWishes(call,wishes),setWeather,setLight,celebrate,setCargo,dispose,destroy:dispose};
 }
