@@ -57,6 +57,25 @@ export function buildHarborLife(T, scene) {
   const slats=['#b78154','#b07a50','#c28d5d','#aa744c','#bf8957'];
   for(let n=0;n<14;n++)box(booth,slats[n%slats.length],-1.54+n*.237,.72,.683,.218,.64,.027);
   box(booth,timber,0,1.11,.02,3.55,.15,1.58);
+  const sashimiPlate=new T.Group();sashimiPlate.name='상어회 접시';sashimiPlate.position.set(-1.02,1.245,-.20);booth.add(sashimiPlate);
+  cyl(sashimiPlate,'#d9e2dc',0,.015,0,.64,.075);
+  cyl(sashimiPlate,'#668c80',0,.057,0,.57,.025);
+  cyl(sashimiPlate,'#f3e8d3',0,.072,0,.49,.012);
+  const sashimiSlices=[];
+  function fillSashimiPlate(){
+    if(sashimiSlices.length)return;
+    for(let i=0;i<27;i++){
+      const ring=i<9?0:i<18?1:2,slot=i%9,angle=slot*Math.PI*2/9+ring*.18,radius=.13+ring*.145;
+      const x=Math.cos(angle)*radius,z=Math.sin(angle)*radius;
+      const slice=ellipsoid(sashimiPlate,'#ee9588',x,.112+ring*.004,z,.142,.027,.069);
+      slice.rotation.y=angle+.18;sashimiSlices.push(slice);
+      ellipsoid(sashimiPlate,'#f8d9c9',x-.012,.137+ring*.004,z-.006,.093,.008,.014).rotation.y=angle+.18;
+    }
+    for(let i=0;i<5;i++){
+      const leaf=ellipsoid(sashimiPlate,'#6d9a68',-.40+i*.075,.105,.30,.13,.018,.045);
+      leaf.rotation.y=-.48+i*.22;
+    }
+  }
   box(booth,'#cda678',0,1.15,.807,3.55,.065,.045);
   box(booth,'#8e5c43',0,.395,.71,3.38,.12,.095);
   for(const x of [-1.56,1.56])for(const z of [-.57,.59]){
@@ -173,6 +192,9 @@ export function buildHarborLife(T, scene) {
   const face=keep(new T.PlaneGeometry(.84,.645));
   const signInk=keep(new T.MeshStandardMaterial({map:signMap,roughness:.78}));
   const front=mesh(marker,face,signInk,0,1.165,.066);front.name=marker.name;
+  // A fishing rod is fixed beside the lookout; its fine line reaches the shark pool.
+  bar(marker,'#574535',[.34,1.02,.11],[1.02,3.02,-.20],.034);
+  curve(marker,'#d9e1dc',[[1.02,3.02,-.20],[1.24,2.12,-.40],[1.48,.34,-.72]],.008,16);
   const back=mesh(marker,face,signInk,0,1.165,-.066);back.rotation.y=Math.PI;
   // Swirls of steam above the pot. A soft alpha gradient leaves the broth and skewers in view.
   const vapourCanvas=document.createElement('canvas');vapourCanvas.width=64;vapourCanvas.height=80;
@@ -258,7 +280,20 @@ export function buildHarborLife(T, scene) {
     w.renderOrder=2;wakePieces.push(w);
   }
   const dayTransmission=new T.Color('#84acb4'),nightTransmission=new T.Color('#507e91');
+  let sceneTime=0,fishingStartedAt=null,plateFilled=false;
+  function fishShark(){
+    if(plateFilled)return 'full';
+    if(fishingStartedAt!==null)return 'busy';
+    fishingStartedAt=sceneTime;return 'started';
+  }
   function update(time=0,night=0,reduced=false){
+    sceneTime=Number.isFinite(time)?time:sceneTime;
+    let caughtNow=false,jump=0;
+    if(fishingStartedAt!==null){
+      const progress=(sceneTime-fishingStartedAt)/2.65;
+      if(progress<1)jump=Math.sin(Math.max(0,progress)*Math.PI)*2.45;
+      else{fishingStartedAt=null;plateFilled=true;fillSashimiPlate();caughtNow=true;}
+    }
     const t=reduced?7:Number.isFinite(time)?time:0,n=Math.max(0,Math.min(1,Number(night)||0));
     for(let i=0;i<steam.length;i++){
       const s=steam[i],life=(t*.32+i*.173)%1;
@@ -269,12 +304,13 @@ export function buildHarborLife(T, scene) {
     // The west side of the quay is clear from the stall to the new shoreline
     // return. A short patrol keeps both the bow and tail in this open water.
     const a=t*.18+.66,rx=1.48,rz=3.20;
-    shark.position.set(-24.8+rx*Math.sin(a),SEA_LEVEL,30.55+rz*Math.cos(a));
+    shark.position.set(-24.8+rx*Math.sin(a),SEA_LEVEL+jump,30.55+rz*Math.cos(a));
     shark.rotation.y=Math.atan2(rx*Math.cos(a),-rz*Math.sin(a));
     animal.position.y=-.083+.048*Math.sin(a*1.8);animal.rotation.z=.038*Math.sin(a);animal.rotation.x=.025*Math.sin(t*1.12);
     tailPivot.rotation.y=.27*Math.sin(t*1.95);echoTail.rotation.y=tailPivot.rotation.y;
     for(let i=0;i<wakePieces.length;i++){const w=wakePieces[i];w.material.opacity=(.60+.13*Math.sin(t*.90-i*.86))*(1-.16*n);w.position.z=.065*Math.sin(t*1.28-i*.46);}
     refract.color.copy(dayTransmission).lerp(nightTransmission,n);detail.color.copy(refract.color).multiplyScalar(1.08);
+    return caughtNow;
   }
   function blocks(x,z){
     if(Math.abs(x-STALL.x)<1.09 && Math.abs(z-STALL.z)<1.93)return true;
@@ -282,5 +318,5 @@ export function buildHarborLife(T, scene) {
     return Math.abs(dx*c-dz*s)<.58&&Math.abs(dx*s+dz*c)<.29;
   }
   function dispose(){scene.remove(group);resources.forEach(resource=>resource.dispose());resources.clear();}
-  update();return {group,booth,shark,sharkWatch:SHARK_WATCH,approach:EOMUK_ZONE,blocks,update,dispose};
+  update();return {group,booth,shark,sharkWatch:SHARK_WATCH,approach:EOMUK_ZONE,blocks,update,fishShark,dispose};
 }
