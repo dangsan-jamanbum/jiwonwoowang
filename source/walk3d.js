@@ -309,14 +309,14 @@ export function mountWalk3D(container, options={}) {
       if(item.carrierId)parent=item.carrierId===cargoSelfId?local.group:peers.get(item.carrierId)?.fig.group||null;
       if(parent){
         if(visual.parent!==parent){visual.parent?.remove(visual);parent.add(visual);}
-        visual.visible=true;visual.position.set(.47,.92,.24);visual.rotation.set(0,0,0);
+        visual.visible=true;visual.position.set(0,.98,.47);visual.scale.setScalar(.84);visual.rotation.set(0,0,0);
       }else if(item.carrierId){
         if(visual.parent!==scene){visual.parent?.remove(visual);scene.add(visual);}
         visual.visible=false;
       }else{
         if(visual.parent!==scene){visual.parent?.remove(visual);scene.add(visual);}
         const x=Number(item.x)||0,z=Number(item.z)||0;
-        visual.visible=true;visual.position.set(x,measuredGround(x,z)+.02,z);visual.rotation.y=Number(item.yaw)||0;
+        visual.visible=true;visual.scale.setScalar(1);visual.position.set(x,measuredGround(x,z)+.02,z);visual.rotation.y=Number(item.yaw)||0;
       }
     }
     for(const [id,visual] of cargoVisuals)if(!cargoItems.some(v=>v.id===id&&!v.delivered)){visual.parent?.remove(visual);cargoVisuals.delete(id);}
