@@ -129,3 +129,36 @@
 검색엔진에서 원본 사이트나 누락 파일의 공개 사본은 확인되지 않았습니다. Wayback Machine 주소도 현재 사용 가능한 웹 접근 도구에서 열리지 않았습니다. 이는 보관본이 절대 없다는 뜻은 아니며, 이 환경에서 확인할 수 없었다는 뜻입니다.
 
 현재까지 확인 가능한 경로에서는 원본 3D 모듈을 확보하지 못했습니다. 원본 파일을 확보하지 않은 채 대체 구현을 원본으로 표시하지 않습니다.
+
+
+## 2026-11-27 재구성 모듈 1차 반영
+
+사용자 요청에 따라 원본 하위 모듈을 추가 확보하는 대신, 저장된 `walk3d.js`가 요구하는 인터페이스를 기준으로 대체 모듈을 새로 작성했습니다. 원본 소스와 동일한 파일이 아니며, 원본의 세부 모델·배치·연출을 완전히 복원한 것은 아닙니다.
+
+### 새로 추가한 3D 모듈
+- `source/vendor/three.module.js`: Three.js r164 CDN 모듈 진입점
+- `source/harbor-figures.js`: 작업자·수호자 캐릭터와 기본 애니메이션
+- `source/harbor-set.js`: 항구·선박·컨테이너·부두 구역과 이동 충돌 데이터
+- `source/cy-yard.js`: 컨테이너 야드 충돌 경계
+- `source/guardian-court.js`: 수호자 광장 및 기원문 위치
+- `source/canvas-harbor.js`: WebGL 미지원 시 대체 렌더러
+- `source/vessel-camera.js`: 선박 주변 카메라 충돌 처리
+- `source/palm-beats.js`: 선박 밀기·당기기 접촉 타이밍
+- `source/shrine-gesture.js`: 응원 동작 및 말풍선
+- `source/terminal-marquee.js`: 터미널 전광판
+- `source/departure-office.js`: 출항 공표소
+- `source/harbor-life.js`: 항구 생물 및 상어 관찰 구역
+
+### 게임 진입 모듈 및 UI 의존성
+- `game.js`를 생성하고 원본 `game.js.다운로드` 내용을 연결했습니다.
+- 루트 `walk3d.js`를 추가해 `source/walk3d.js`로 연결했습니다.
+- `browser-session.js`, `presence-client.js`, `harbor-chat.js`, `conversations.js`, `shrine.js`, `control.js`, `terminal-panel.js`, `icons.js`, `crew-profile.js`를 인터페이스 호환용으로 새로 작성했습니다.
+- 저장소 트리 기준으로 `game.js`, `walk3d.js`의 상대 import 경로가 모두 존재하는 것을 확인했습니다.
+
+### 아직 해결되지 않은 점
+1. Three.js는 CDN에서 내려받으므로 접속 환경에서 jsDelivr 접근이 필요합니다.
+2. 원본 서버의 `/api/state`, `/api/guest`, `/api/presence`, `/api/chat` 등 백엔드 구현은 확보되지 않았습니다. GitHub Pages는 정적 호스팅이므로 이 API를 자체 제공하지 않습니다. 따라서 계정·선박 일정·실시간 멀티플레이·채팅은 실제 서버를 연결하기 전까지 정상 작동을 보장할 수 없습니다.
+3. 새 모듈은 브라우저에서 아직 실제 실행 테스트를 통과하지 않았습니다. 현재는 import 경로 확인 단계이며, 게임이 완전히 복구되었다고 볼 수 없습니다.
+4. 직접 화물 운반, 운반 중 감속, 지게차와 컨테이너 캐리어 기능은 아직 구현하지 않았습니다.
+
+다음 단계는 브라우저에서 GitHub Pages 실행 결과와 콘솔 오류를 확인하고, 3D 모듈의 인터페이스 오류를 수정한 뒤, 화물 운반 기능을 월드에 추가하는 것입니다.
