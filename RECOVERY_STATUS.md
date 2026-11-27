@@ -43,3 +43,39 @@
 2. 저장된 HTML의 상대경로를 저장소 구조에 맞게 정리
 3. 로컬 실행 및 브라우저 콘솔 오류 확인
 4. 원본 동작을 유지하면서 직접 화물 운반, 운반 중 감속, 지게차/컨테이너 캐리어, 멀티플레이 동기화를 추가
+
+
+## 2026-11-27 추가 복구 작업
+
+- 저장한 원본 HTML의 CSS/JS/이미지 경로 14곳에서 잘못된 `ATD · 세상에서 가장 간절한 항구_files/` 접두사를 제거해 저장소 루트의 실제 파일 위치와 일치시켰습니다.
+- GitHub Pages가 기본 진입 파일로 인식할 수 있도록 같은 HTML을 `index.html`로 추가했습니다.
+- 단, 현재 저장소에는 아래 원본 모듈이 아직 없으므로 이 상태를 실행 완료로 볼 수 없습니다.
+
+### 아직 필요한 원본 모듈
+
+게임 시작 모듈:
+- `harbor-chat.js`
+- `browser-session.js`
+- `presence-client.js`
+- `conversations.js`
+- `shrine.js`
+- `control.js`
+- `terminal-panel.js`
+- `icons.js`
+- `crew-profile.js`
+
+3D 월드 모듈:
+- `source/vendor/three.module.js`
+- `source/harbor-figures.js`
+- `source/harbor-set.js`
+- `source/cy-yard.js`
+- `source/guardian-court.js`
+- `source/canvas-harbor.js`
+- `source/vessel-camera.js`
+- `source/palm-beats.js`
+- `source/shrine-gesture.js`
+- `source/terminal-marquee.js`
+- `source/departure-office.js`
+- `source/harbor-life.js`
+
+원본 웹사이트에서 이 파일들을 자동으로 내려받는 접근은 현재 차단되어 있어 아직 복구하지 못했습니다. 비슷한 코드로 대체하면 원본 3D 게임이 아니게 되므로 임의 대체하지 않습니다.
