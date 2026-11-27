@@ -172,7 +172,7 @@ const server=http.createServer(async(req,res)=>{
         return json(res,200,{profile:p});
       }
       if(route==='join'){
-        await getPncSchedule(); await getPncSchedule(); if(!calls.some(c=>c.id===body.callId))return json(res,404,{error:'항차를 찾을 수 없습니다.'});
+        await getPncSchedule(); if(!calls.some(c=>c.id===body.callId))return json(res,404,{error:'항차를 찾을 수 없습니다.'});
         session.joined.add(body.callId);return json(res,200,{ok:true});
       }
       if(route==='favorite'){
@@ -182,7 +182,7 @@ const server=http.createServer(async(req,res)=>{
         return json(res,200,{ok:true});
       }
       if(route==='wish'){
-        if(!calls.some(c=>c.id===body.callId))return json(res,404,{error:'항차를 찾을 수 없습니다.'});
+        await getPncSchedule(); if(!calls.some(c=>c.id===body.callId))return json(res,404,{error:'항차를 찾을 수 없습니다.'});
         const item={id:randomUUID(),...body,author:profileFor(session).name,createdAt:new Date().toISOString()};
         wishes.push(item);return json(res,200,{ok:true,wish:item});
       }
