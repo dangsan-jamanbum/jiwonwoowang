@@ -2,6 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { onHarborLand, CY_STACK_BOUNDS } from './source/cy-yard.js';
 
 const PORT = Number(process.env.PORT || 10000);
 const ROOT = process.cwd();
@@ -9,11 +10,40 @@ const sessions = new Map();
 const presence = new Map();
 const chats = [];
 const wishes = [];
-const cargoItems = [
-  {id:'cargo-pnc-001',kind:'weather',name:'기상 재해 긴급 대응',x:-7.3,z:-55.6,yaw:0,carrierId:null,delivered:false},
-  {id:'cargo-pnc-002',kind:'crew',name:'긴급 작업 인원 파견',x:-9.5,z:-55.1,yaw:.18,carrierId:null,delivered:false},
-  {id:'cargo-pnc-003',kind:'equipment',name:'항만 복구 장비 지원',x:-5.1,z:-55.1,yaw:-.18,carrierId:null,delivered:false}
+const delayCargoTypes = [
+  ['weather','태풍·강풍 경보'],['weather','낙뢰·폭우 경보'],['weather','짙은 해무'],['weather','풍랑 주의보'],
+  ['weather','저시정 안개'],['weather','폭우 침수 위험'],['weather','강풍으로 인한 작업 중단'],['weather','기상 악화 경보'],
+  ['equipment','안벽 크레인 고장'],['equipment','하역 장비 정지'],['equipment','야드 트랙터 고장'],
+  ['equipment','전력 공급 장애'],['equipment','컨테이너 고정 장치 파손'],['equipment','선적 설비 점검'],['equipment','항만 장비 긴급 수리']
 ];
+const cancelCargoTypes = [
+  ['crew','긴급 작업 인원 파견'],['crew','추가 하역 인력 투입'],['crew','야간 작업조 지원'],['crew','안전 관리 인력 증원'],
+  ['crew','정비 기술자 파견'],['crew','유도 작업자 지원'],['crew','긴급 복구 인력 투입'],['crew','선적 지원 인력 증원'],
+  ['equipment','예비 크레인 투입'],['equipment','하역 장비 긴급 지원'],['equipment','전력 복구 장비'],['equipment','컨테이너 고정 장비'],
+  ['equipment','야드 장비 추가 배치'],['equipment','긴급 수리 공구 세트'],['equipment','선적 보조 설비 지원']
+];
+function makeCargoSpawnPoints(count){
+  let seed=0x5a17c9;
+  const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+  const points=[];
+  for(let attempt=0;attempt<60000&&points.length<count;attempt++){
+    const x=-42+random()*73,z=-108.4+random()*163.6;
+    if(!onHarborLand(x,z))continue;
+    if(CY_STACK_BOUNDS.some(b=>x>=b.minX-1.25&&x<=b.maxX+1.25&&z>=b.minZ-1.25&&z<=b.maxZ+1.25))continue;
+    if(Math.hypot(x+16.15,z-24.7)<4.6||Math.hypot(x+18.42,z-28.15)<2.8)continue;
+    if(Math.hypot(x+5.15,z+36.4)<4.0)continue;
+    if(points.some(p=>Math.hypot(x-p.x,z-p.z)<3.15))continue;
+    points.push({x,z,yaw:random()*Math.PI*2});
+  }
+  if(points.length!==count)throw new Error('화물 배치 위치를 충분히 찾지 못했습니다: '+points.length+'/'+count);
+  return points;
+}
+const cargoSpawns=makeCargoSpawnPoints(30);
+const cargoItems=[...delayCargoTypes.map(([kind,name],i)=>({effect:'delay',kind,name})),
+  ...cancelCargoTypes.map(([kind,name],i)=>({effect:'cancel',kind,name}))].map((item,i)=>({
+    id:'cargo-pnc-'+String(i+1).padStart(3,'0'),...item,
+    ...cargoSpawns[i],carrierId:null,delivered:false
+  }));
 const delayByCall = new Map();
 const cargoEvents = [];
 let calls = [
@@ -406,7 +436,8 @@ const server=http.createServer(async(req,res)=>{
           item.carrierId=null;item.x=x;item.z=z;
           const delivered=Math.hypot(x-10.8,z-5)<=4.5;
           item.delivered=delivered;
-          const deltaDays=delivered?-1:1;
+          const effect=item.effect==='cancel'?'cancel':'delay';
+          const deltaDays=delivered?(effect==='cancel'?-1:1):(effect==='cancel'?1:-1);
           const total=(delayByCall.get(callId)||0)+deltaDays;
           delayByCall.set(callId,total);
           const event={id:randomUUID(),callId,itemId:item.id,itemName:item.name,actor:profileFor(session).name,
@@ -415,7 +446,9 @@ const server=http.createServer(async(req,res)=>{
         }else return json(res,400,{error:'지원하지 않는 화물 작업입니다.'});
         return json(res,200,{selfId:session.id,items:cargoItems.filter(v=>!v.delivered),delayDays:delayByCall.get(callId)||0,
           events:cargoEvents.filter(e=>e.callId===callId).slice(-8).reverse(),
-          message:body.mode==='pickup'?'화물을 들었습니다. 출항 부두에 내려놓으면 지연이 1일 줄어듭니다.':item.delivered?'선적 완료! 출항 지연이 1일 줄었습니다.':'화물을 지정 선적 구역 밖에 내려놓아 지연이 1일 늘었습니다.'});
+          message:body.mode==='pickup'?'화물을 들었습니다. 출항 부두의 지정 구역에 옮겨 놓으세요.':
+            item.delivered?(item.effect==='cancel'?'상쇄 지원 완료! 출항 지연이 1일 줄었습니다.':'지연 요인 도착! 출항 지연이 1일 늘었습니다.'):
+            (item.effect==='cancel'?'상쇄 아이템을 잘못 내려놓아 출항 지연이 1일 늘었습니다.':'지연 아이템을 다른 곳에 내려놓아 출항 지연이 1일 줄었습니다.')});
       }
       if(route==='chat'){
         const message={id:chats.length?chats[chats.length-1].id+1:1,terminal:String(body.terminal||'busan'),text:String(body.text||'').trim().slice(0,300),avatarId:session.id,name:profileFor(session).name,createdAt:new Date().toISOString()};
