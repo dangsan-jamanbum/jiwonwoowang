@@ -87,9 +87,9 @@ function parsePncSchedule(payload){
     if(!name||!/[A-Z0-9-]+\s*\/\s*20\d{2}/i.test(terminalVoy))continue;
     const [inboundVoy='',outboundVoy='']=carrierVoy.split('/').map(v=>v.trim());
     const etb=pncDate(cells[7]),etd=pncDate(cells[8]);
-    const now=Date.now(),etbMs=etb?Date.parse(etb):NaN,etdMs=etd?Date.parse(etd):NaN;
-    const berthPhase=Number.isFinite(etdMs)&&now>etdMs?'departed':
-      Number.isFinite(etbMs)&&now>=etbMs?'alongside':'scheduled';
+    // MN014 공개 표의 접안/출항 시각은 예정 시각이다.
+    // 실제 접안/출항 확인값이 없으므로 시각만으로 운항 상태를 추정하지 않는다.
+    const berthPhase='scheduled';
     const terminalCode=terminalVoy.split('/')[0].trim();
     const year=(terminalVoy.match(/20\d{2}/)||[])[0];
     const discharge=Number(String(cells[11]||'').replace(/,/g,''))||0;
@@ -98,7 +98,7 @@ function parsePncSchedule(payload){
     found.push({
       id:'official.busan.pnc.'+terminalCode+'.'+year,name,voy:outboundVoy||inboundVoy,
       carrierVoy,terminalVoy,inboundVoy,outboundVoy,operator,route,port:'busan',terminal:'pnc',
-      berth:cells[9]||'미정',loading:{plan:load,workTotal:discharge+load,completed:null,
+      berth:cells[9]||'미정',loading:{plan:load,workTotal:null,completed:null,
         remainingVan:null,remainingMoves:null,workUnit:null,completedUnit:null,
         planSourceUrl:PNC_BERTH_URL,workSourceUrl:null,checkedAt:new Date().toISOString(),workCheckedAt:null},
       eta:null,etb,atb:null,etd,atd:null,atdVerified:false,berthPhase,
