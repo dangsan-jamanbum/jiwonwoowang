@@ -3,7 +3,7 @@ import {sessionHeaders} from './browser-session.js';
 import {connectPresence} from './presence-client.js?v=23';
 import {mountConversations} from './conversations.js?v=19';
 import {renderShrine} from './shrine.js';
-import {renderControl} from './control.js?v=22';
+import {renderControl} from './control.js?v=23';
 import {renderTerminalPanel} from './terminal-panel.js';
 import {ico,hydrateIcons} from './icons.js';
 import {crewIdentity,crewPortrait,editCrewProfile} from './crew-profile.js';
