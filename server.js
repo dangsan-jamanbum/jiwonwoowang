@@ -66,7 +66,7 @@ const server=http.createServer(async(req,res)=>{
   if(req.method==='OPTIONS'){res.writeHead(204,{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type, X-ATD-Browser','Access-Control-Allow-Methods':'GET, POST, OPTIONS'});return res.end();}
   const url=new URL(req.url,'http://localhost');
   if(!url.pathname.startsWith('/api/')) return sendStatic(req,res);
-  const session=cookieSession(req);
+  const session=cookieSession(req,res);
   try{
     const route=url.pathname.slice(5);
     if(req.method==='GET' && route==='state') return json(res,200,stateFor(session,url));
