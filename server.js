@@ -26,18 +26,18 @@ function decodeHtml(value){
 }
 function parsePncSchedule(html){
   const plain=decodeHtml(String(html)
-    .replace(/<script[\\s\\S]*?<\\/script>|<style[\\s\\S]*?<\\/style>/gi,' ')
-    .replace(/<br\\s*\\/?\s*>|<\\/(?:tr|td|th|div|p|li|h[1-6])\\s*>/gi,'\\n')
+    .replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi,' ')
+    .replace(/<br\s*\/?>|<\/(?:tr|td|th|div|p|li|h[1-6])\s*>/gi,'\n')
     .replace(/<[^>]+>/g,' '));
-  const lines=plain.split(/\\r?\\n/).map(v=>v.replace(/\\s+/g,' ').trim()).filter(Boolean);
+  const lines=plain.split(/\r?\n/).map(v=>v.replace(/\s+/g,' ').trim()).filter(Boolean);
   const found=[];
-  const voyRe=/^([A-Z0-9-]{4,})\\s*\\/\\s*(20\\d{2})$/i;
+  const voyRe=/^([A-Z0-9-]{4,})\s*\/\s*(20\d{2})$/i;
   for(let i=1;i<lines.length-3;i++){
     const match=lines[i].match(voyRe);
     if(!match)continue;
-    const name=lines[i-1].replace(/\\s+/g,' ').trim();
+    const name=lines[i-1].replace(/\s+/g,' ').trim();
     const route=lines[i+1]||'';
-    const stats=(lines.slice(i+2,i+6).join(' ').match(/D\\s*:\\s*\\(?([\\d,]+)\\)?[\\s,;]*L\\s*:\\s*\\(?([\\d,]+)\\)?[\\s,;]*S\\s*:\\s*\\(?([\\d,]+)\\)?[\\s,;]*Y\\s*:\\s*\\(?([\\d,]+)\\)?/i));
+    const stats=lines.slice(i+2,i+6).join(' ').match(/D\s*:\s*\(?([\d,]+)\)?[\s,;]*L\s*:\s*\(?([\d,]+)\)?[\s,;]*S\s*:\s*\(?([\d,]+)\)?[\s,;]*Y\s*:\s*\(?([\d,]+)\)?/i);
     if(!/^[A-Z0-9][A-Z0-9 .'-]{2,60}$/i.test(name)||!route.includes('/'))continue;
     const n=v=>Number(String(v||'').replace(/,/g,''));
     const discharge=stats?n(stats[1]):null,load=stats?n(stats[2]):null,shift=stats?n(stats[3]):null,yard=stats?n(stats[4]):null;
