@@ -299,7 +299,10 @@ export function buildHarborLife(T, scene) {
   }
   const dayTransmission=new T.Color('#84acb4'),nightTransmission=new T.Color('#507e91');
   let sceneTime=0,fishingState='idle',baitAt=0,reelHits=0,plateFilled=false,cookedAt=0,carryParent=null;
-  function setSashimiPlate(){fishingState='cooked';plateFilled=true;fillSashimiPlate();}
+  function setSashimiPlate(full=true){
+    if(full){fishingState='cooked';plateFilled=true;fillSashimiPlate();}
+    else if(fishingState==='cooked'){fishingState='eaten';plateFilled=false;sashimiSlices.forEach(v=>v.visible=false);babyShark.visible=true;}
+  }
   function fishShark(){
     if(fishingState==='idle'){fishingState='casting';baitAt=sceneTime+2.0;return 'cast';}
     if(fishingState==='casting')return 'waiting';
