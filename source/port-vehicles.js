@@ -54,5 +54,5 @@ export function buildPortVehicles(T,scene){
     return Math.hypot(x-f.x,z-f.z)<1.18 || (Math.abs(x-c.x)<2.05&&Math.abs(z-c.z)<3.05);
   }
   update(0);
-  return {update,blocks,destroy(){scene.remove(root);}};
+  return {update,blocks,destroy(){scene.remove(root);unit.dispose();wheelGeo.dispose();Object.values(materials).forEach(m=>m.dispose());}};
 }
