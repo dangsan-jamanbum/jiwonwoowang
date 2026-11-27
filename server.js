@@ -26,6 +26,81 @@ const PNC_CACHE_MS=2*60*1000;
 let pncCache={checkedAt:0,calls:[],source:{kind:'demo',stale:true,label:'공식 자료 연결 전'}};
 let pncRefresh=null;
 
+const ORIGINAL_API_BASE='https://atd-harbor-club.blairsurvive.chatgpt.site';
+const ORIGINAL_CACHE_MS=45*1000;
+const originalCache=new Map();
+const originalInflight=new Map();
+
+async function originalApi(route, params={}){
+  const query=new URLSearchParams();
+  for(const [key,value] of Object.entries(params))if(value!==undefined&&value!==null&&String(value)!=='')query.set(key,String(value));
+  const path='/api/'+route+(query.size?'?'+query.toString():'');
+  const key=path;
+  const cached=originalCache.get(key);
+  if(cached&&Date.now()-cached.at<ORIGINAL_CACHE_MS)return {data:cached.data,stale:false};
+  if(originalInflight.has(key))return originalInflight.get(key);
+  const task=(async()=>{
+    try{
+      const response=await fetch(ORIGINAL_API_BASE+path,{method:'GET',headers:{
+        'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+        'Accept':'application/json, text/plain, */*',
+        'Accept-Language':'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Origin':ORIGINAL_API_BASE,
+        'Referer':ORIGINAL_API_BASE+'/',
+        'X-ATD-Browser':'1'
+      },signal:AbortSignal.timeout(9000)});
+      if(!response.ok)throw new Error('원본 API 응답 '+response.status);
+      const data=await response.json();
+      originalCache.set(key,{at:Date.now(),data});
+      return {data,stale:false};
+    }catch(error){
+      console.warn('[original API] '+path+' failed:',error.message);
+      if(cached)return {data:cached.data,stale:true};
+      return {data:null,stale:true,error};
+    }finally{originalInflight.delete(key);}
+  })();
+  originalInflight.set(key,task);
+  return task;
+}
+function originalCalls(data){
+  if(Array.isArray(data?.calls))return data.calls;
+  if(Array.isArray(data?.terminalStatus?.calls))return data.terminalStatus.calls;
+  return [];
+}
+function applyOriginalCalls(terminal,rows){
+  if(!Array.isArray(rows)||!rows.length)return;
+  calls=[...calls.filter(c=>c.terminal!==terminal),...rows.map(c=>({...c,terminal:c.terminal||terminal,isDemo:false}))];
+}
+async function stateWithOriginal(session,url){
+  const terminal=['pnc','pnit'].includes(url.searchParams.get('terminal'))?url.searchParams.get('terminal'):'pnc';
+  const local=await stateFor(session,url);
+  const result=await originalApi('state',{terminal,call:url.searchParams.get('call')});
+  const remote=result.data;
+  if(!remote||typeof remote!=='object')return local;
+  const rows=originalCalls(remote).filter(c=>(c.terminal||terminal)===terminal);
+  applyOriginalCalls(terminal,rows);
+  const remoteStatus=remote.terminalStatus||{};
+  const localStatus=local.terminalStatus||{};
+  const selectedId=url.searchParams.get('call');
+  const selected=rows.find(c=>c.id===selectedId)||remote.selected||rows[0]||local.selected;
+  return {...local,
+    ...(remote.terminals?{terminals:remote.terminals}:{}),
+    calls:rows.length?rows:local.calls,
+    selected:selected||null,
+    terminal,
+    terminalStatus:{...localStatus,...remoteStatus,
+      calls:(rows.length?rows:localStatus.calls||[]).map(c=>({...c,delayDays:delayByCall.get(c.id)||0})),
+      yardTrucks:remoteStatus.yardTrucks??remote.yardTrucks??localStatus.yardTrucks??[],
+      source:remoteStatus.source||remote.source||localStatus.source,
+      delayDays:selected?(delayByCall.get(selected.id)||0):0,
+      delayEvents:selected?cargoEvents.filter(e=>e.callId===selected.id).slice(-4).reverse():[]
+    },
+    weather:remote.weather??local.weather,
+    source:remote.source||remoteStatus.source||local.source,
+    officialSource:remote.officialSource??local.officialSource
+  };
+}
+
 function decodeHtml(value){
   return String(value??'').replace(/&nbsp;|&#160;/gi,' ')
     .replace(/&amp;/gi,'&').replace(/&quot;/gi,'"').replace(/&#39;|&apos;/gi,"'")
@@ -240,21 +315,45 @@ const server=http.createServer(async(req,res)=>{
   const session = cookieSession(req, res);
   try{
     const route=url.pathname.slice(5);
-    if(req.method==='GET' && route==='state') return json(res,200,await stateFor(session,url));
+    if(req.method==='GET' && route==='state') return json(res,200,await stateWithOriginal(session,url));
     if(req.method==='GET' && route==='terminal-board'){
       const terminal=url.searchParams.get('terminal')==='pnit'?'pnit':'pnc';
+      const original=await originalApi('terminal-board',{terminal});
+      if(original.data&&typeof original.data==='object'){
+        const data=original.data;
+        const rows=originalCalls(data).filter(c=>(c.terminal||terminal)===terminal);
+        applyOriginalCalls(terminal,rows);
+        const base=data.terminalStatus||data;
+        const liveRows=(rows.length?rows:(base.calls||[])).map(c=>({...c,delayDays:delayByCall.get(c.id)||0}));
+        return json(res,200,{...base,terminal,calls:liveRows,
+          yardTrucks:base.yardTrucks??data.yardTrucks??[],
+          weather:data.weather??base.weather,
+          source:base.source||data.source||{kind:'original',label:'원본 실시간 터미널 데이터',stale:original.stale},
+          stale:original.stale,
+          delayDays:liveRows.length?(delayByCall.get(liveRows[0].id)||0):0,
+          delayEvents:cargoEvents.filter(e=>liveRows.some(c=>c.id===e.callId)).slice(-4).reverse()});
+      }
       const pnc=await getPncSchedule();
       const source=terminal==='pnc'?pnc.source:{kind:'demo',label:'부산북항 예시 일정',checkedAt:new Date().toISOString(),stale:false};
       const rows=calls.filter(c=>c.terminal===terminal).map(c=>({...c,delayDays:delayByCall.get(c.id)||0}));
-      return json(res,200,{terminal,calls:rows,yardTrucks:[],source,delayDays:rows.length?(delayByCall.get(rows[0].id)||0):0,delayEvents:cargoEvents.filter(e=>rows.some(c=>c.id===e.callId)).slice(-4).reverse()});
+      return json(res,200,{terminal,calls:rows,yardTrucks:[],source,stale:true,delayDays:rows.length?(delayByCall.get(rows[0].id)||0):0,delayEvents:cargoEvents.filter(e=>rows.some(c=>c.id===e.callId)).slice(-4).reverse()});
     }
     if(req.method==='GET' && route==='cargo'){
       const callId=url.searchParams.get('call')||stateForCallId(url);
       return json(res,200,{selfId:session.id,items:cargoItems.filter(v=>!v.delivered),delayDays:delayByCall.get(callId)||0,events:cargoEvents.filter(e=>e.callId===callId).slice(-8).reverse()});
     }
     if(req.method==='GET' && route==='search'){
-      const q=(url.searchParams.get('q')||'').toLowerCase();
-      await getPncSchedule(); return json(res,200,{calls:calls.filter(c=>(c.name+' '+c.voy).toLowerCase().includes(q))});
+      const q=(url.searchParams.get('q')||'').trim();
+      const terminal=url.searchParams.get('terminal')||'';
+      const original=await originalApi('search',{q,terminal});
+      if(original.data&&Array.isArray(original.data.calls)){
+        const rows=original.data.calls;
+        for(const term of ['pnc','pnit'])applyOriginalCalls(term,rows.filter(c=>(c.terminal||term)===term));
+        return json(res,200,{...original.data,calls:rows,stale:original.stale});
+      }
+      await getPncSchedule();
+      const needle=q.toLowerCase();
+      return json(res,200,{calls:calls.filter(c=>(c.name+' '+c.voy+' '+c.carrierVoy+' '+c.terminalVoy).toLowerCase().includes(needle)),stale:true});
     }
     if(req.method==='GET' && route==='chat'){
       const after=Number(url.searchParams.get('after')||0),terminal=url.searchParams.get('terminal')||'busan';
