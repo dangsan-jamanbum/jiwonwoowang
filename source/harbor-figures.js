@@ -1011,7 +1011,7 @@ function performer(T,style,g){
 
   }
   animate();
-  return {group:G,handL:arms[0].palm,handR:arms[1].palm,cigaretteTip:r.cigaretteTip,eomukTip:r.eomukTip,mouth:r.mouth,animate,dispose:cloth?.dispose};
+  return {group:G,handL:arms[0].palm,handR:arms[1].palm,cigaretteTip:r.cigaretteTip,eomuk:r.eomuk,eomukTip:r.eomukTip,mouth:r.mouth,animate,dispose:cloth?.dispose};
 }
 
 /** Build a smooth, fully rigged Korean office-worker avatar. Positive Z is
