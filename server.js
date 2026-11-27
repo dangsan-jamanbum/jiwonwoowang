@@ -76,7 +76,7 @@ const cargoItems=cargoBlueprints.map((item,i)=>({
 }));
 const delayByCall = new Map();
 const cargoEvents = [];
-let sashimiPlateFull=false;
+let sashimiPlateFull=false,sharkEaten=false;
 let calls = [
   { id:'demo-pnc-001', terminal:'pnc', name:'ATD 부산항 연습선', voy:'DEMO-001', outboundVoy:'DEMO-001', inboundVoy:'DEMO-001', carrierVoy:'DEMO-001', berth:'연습 부두', berthPhase:'alongside', etd:null, etb:null, atd:null, atdVerified:false, isDemo:true },
   { id:'demo-pnit-001', terminal:'pnit', name:'ATD 북항 연습선', voy:'DEMO-002', outboundVoy:'DEMO-002', inboundVoy:'DEMO-002', carrierVoy:'DEMO-002', berth:'연습 부두', berthPhase:'alongside', etd:null, etb:null, atd:null, atdVerified:false, isDemo:true }
@@ -450,9 +450,9 @@ const server=http.createServer(async(req,res)=>{
         return json(res,200,{ok:true});
       }
       if(route==='fishing'){
-        if(body.mode==='cooked')sashimiPlateFull=true;
-        if(body.mode==='eaten')sashimiPlateFull=false;
-        return json(res,200,{ok:true,sashimiPlateFull});
+        if(body.mode==='cooked'){sashimiPlateFull=true;sharkEaten=false;}
+        if(body.mode==='eaten'){sashimiPlateFull=false;sharkEaten=true;}
+        return json(res,200,{ok:true,sashimiPlateFull,sharkEaten});
       }
       if(route==='cargo'){
         const item=cargoItems.find(v=>v.id===body.itemId&&!v.delivered);
