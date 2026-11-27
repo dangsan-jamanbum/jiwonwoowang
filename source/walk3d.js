@@ -346,6 +346,7 @@ export function mountWalk3D(container, options={}) {
       return true;
     }catch(error){options.onHint?.(error?.message||'화물을 옮기지 못했습니다.');return false;}
   }
+  syncCargoVisuals();
   const reduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const labels=element('div','position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:1;');
   labels.className='harbor-live-labels';host.append(labels);
