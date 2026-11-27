@@ -197,6 +197,7 @@ export function buildHarborLife(T, scene) {
   // A fishing rod is fixed beside the lookout; its fine line reaches the shark pool.
   bar(marker,'#574535',[.34,1.02,.11],[1.02,3.02,-.20],.034);
   curve(marker,'#d9e1dc',[[1.02,3.02,-.20],[1.24,2.12,-.40],[1.48,.34,-.72]],.008,16);
+  const baitFloat=ellipsoid(marker,'#e85d54',1.48,.30,-.72,.075,.095,.075);baitFloat.name='낚싯줄 끝의 미끼';
   const back=mesh(marker,face,signInk,0,1.165,-.066);back.rotation.y=Math.PI;
   // Swirls of steam above the pot. A soft alpha gradient leaves the broth and skewers in view.
   const vapourCanvas=document.createElement('canvas');vapourCanvas.width=64;vapourCanvas.height=80;
@@ -338,7 +339,8 @@ export function buildHarborLife(T, scene) {
     sceneTime=Number.isFinite(time)?time:sceneTime;
     let event=null,jump=0;
     if(fishingState==='casting'&&sceneTime>=baitAt)fishingState='bite';
-    if(fishingState==='bite')jump=.10+.08*Math.sin(sceneTime*12);
+    if(fishingState==='bite'){jump=.10+.08*Math.sin(sceneTime*12);baitFloat.position.y=.30+.12*Math.abs(Math.sin(sceneTime*10));}
+    else baitFloat.position.y=.30+.025*Math.sin(sceneTime*2.1);
     if(fishingState==='cooking'&&sceneTime>=cookedAt){fishingState='cooked';plateFilled=true;fillSashimiPlate();event='cooked';}
     if(fishingState==='eaten'){
       babyShark.visible=true;
