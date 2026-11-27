@@ -1,5 +1,5 @@
 import * as THREE from './vendor/three.module.js';
-import { makeWorker, makeGuardian } from './harbor-figures.js?v=17';
+import { makeWorker, makeGuardian } from './harbor-figures.js?v=18';
 import { buildHarbor } from './harbor-set.js?v=22';
 import { CY_STACK_BOUNDS } from './cy-yard.js';
 import { buildGuardianCourt } from './guardian-court.js';
@@ -266,7 +266,7 @@ export function mountWalk3D(container, options={}) {
     // Figures own geometry/materials through their factory; shared materials may be cached.
     fig.dispose?.();
   }
-  let profile=options.profile || {},style=profile.style==='vest'?'vest':'cardigan', local=addFigure(style);
+  let profile=options.profile || {},style=profile.style==='vest'?'vest':'honghong', local=addFigure(style);
   const sharkDishProp=new THREE.Group();sharkDishProp.name='손에 든 상어 요리';local.handR.add(sharkDishProp);sharkDishProp.position.set(0,.018,.055);sharkDishProp.visible=false;
   const dishBowl=new THREE.Mesh(new THREE.CylinderGeometry(.105,.085,.035,16),new THREE.MeshStandardMaterial({color:'#f1e5ce',roughness:.72}));dishBowl.position.y=.018;sharkDishProp.add(dishBowl);
   const dishFoods={
