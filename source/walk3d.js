@@ -20,7 +20,7 @@ const yawTo = (from,to) => Math.atan2(to.x-from.x,to.z-from.z);
 const turn = (a,b,dt) => a + Math.atan2(Math.sin(b-a),Math.cos(b-a)) * (1-Math.exp(-dt*22));
 const BASE_YAW = -.34;
 const STEP = .65;
-const WALK_SPEED=5.15, TRAVEL_SPEED=10.2, GAIT_PER_UNIT=2.58;
+const WALK_SPEED=5.15, RUN_SPEED=8.15, CARRY_WALK_SPEED=3.15, CARRY_RUN_SPEED=4.55, TRAVEL_SPEED=10.2, GAIT_PER_UNIT=2.58;
 const SMOKE_DURATION=7.2, EAT_DURATION=2.85;
 function bitePose(age) {
   if(age<0||age>=EAT_DURATION)return 0;
@@ -188,7 +188,7 @@ export function mountWalk3D(container, options={}) {
   if(!renderer?.domElement)throw new Error('3D 화면을 만들 수 없습니다.');
   const canvas=renderer.domElement;canvas.tabIndex=0;
   canvas.style.cssText='display:block;width:100%;height:100%;touch-action:none;cursor:grab;outline:none;';
-  canvas.setAttribute('aria-label','부산항 3D 탐험. WASD나 방향키로 걷고 화면을 드래그해 둘러보세요.');
+  canvas.setAttribute('aria-label','부산항 3D 탐험. WASD로 이동, Shift로 달리기, E로 가까운 화물을 들거나 내려놓기. 화면을 드래그해 둘러보세요.');
   renderer.outputColorSpace=THREE.SRGBColorSpace;
   renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;
   renderer.shadowMap.enabled=!software;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
@@ -283,6 +283,67 @@ export function mountWalk3D(container, options={}) {
   const courtCenter=courtBounds.getCenter(new V3()),courtSize=courtBounds.getSize(new V3());
   const courtFront=new V3(zones.shrine.x-courtCenter.x,0,zones.shrine.z-courtCenter.z).normalize();
   const peers=new Map(), palmMarks=[];
+  const cargoVisuals=new Map();
+  let cargoItems=Array.isArray(options.cargoItems)?options.cargoItems.map(v=>({...v})):[],cargoSelfId=options.cargoSelfId||options.getSelfId?.()||null;
+  let carriedCargoId=cargoItems.find(v=>v.carrierId===cargoSelfId)?.id||null;
+  const cargoBoxGeo=new THREE.BoxGeometry(.78,.62,.62),cargoBandGeo=new THREE.BoxGeometry(.80,.075,.66);
+  const cargoWood=new THREE.MeshStandardMaterial({color:0xb77b43,roughness:.88}),cargoBand=new THREE.MeshStandardMaterial({color:0x394a50,metalness:.48,roughness:.55});
+  function makeCargoVisual(){
+    const g=new THREE.Group();g.name='직접 운반 화물';
+    const box=new THREE.Mesh(cargoBoxGeo,cargoWood);box.position.y=.36;box.castShadow=true;box.receiveShadow=true;g.add(box);
+    for(const y of [.18,.53]){const band=new THREE.Mesh(cargoBandGeo,cargoBand);band.position.y=y;band.castShadow=true;g.add(band);}
+    return g;
+  }
+  function syncCargoVisuals(){
+    cargoSelfId=options.getSelfId?.()||cargoSelfId;
+    for(const item of cargoItems){
+      if(!item?.id||item.delivered)continue;
+      let visual=cargoVisuals.get(item.id);
+      if(!visual){visual=makeCargoVisual();cargoVisuals.set(item.id,visual);}
+      let parent=null;
+      if(item.carrierId)parent=item.carrierId===cargoSelfId?local.group:peers.get(item.carrierId)?.fig.group||null;
+      if(parent){
+        if(visual.parent!==parent){visual.parent?.remove(visual);parent.add(visual);}
+        visual.visible=true;visual.position.set(.47,.92,.24);visual.rotation.set(0,0,0);
+      }else if(item.carrierId){
+        if(visual.parent!==scene){visual.parent?.remove(visual);scene.add(visual);}
+        visual.visible=false;
+      }else{
+        if(visual.parent!==scene){visual.parent?.remove(visual);scene.add(visual);}
+        const x=Number(item.x)||0,z=Number(item.z)||0;
+        visual.visible=true;visual.position.set(x,measuredGround(x,z)+.02,z);visual.rotation.y=Number(item.yaw)||0;
+      }
+    }
+    for(const [id,visual] of cargoVisuals)if(!cargoItems.some(v=>v.id===id&&!v.delivered)){visual.parent?.remove(visual);cargoVisuals.delete(id);}
+    carriedCargoId=cargoItems.find(v=>v.carrierId===cargoSelfId&&!v.delivered)?.id||null;
+  }
+  function setCargo(items,selfId){
+    if(Array.isArray(items))cargoItems=items.map(v=>({...v}));
+    if(selfId)cargoSelfId=selfId;
+    syncCargoVisuals();
+  }
+  function nearestCargo(){
+    let best=null,bestDistance=2.25;
+    for(const item of cargoItems){
+      if(item.delivered||item.carrierId)continue;
+      const d=distance(player,item);
+      if(d<bestDistance){best=item;bestDistance=d;}
+    }
+    return best;
+  }
+  async function interactCargo(){
+    const item=carriedCargoId?cargoItems.find(v=>v.id===carriedCargoId):nearestCargo();
+    if(!item)return false;
+    const mode=carriedCargoId?'drop':'pickup';
+    try{
+      const result=await options.onCargoAction?.(mode,item.id,{x:player.x,z:player.z});
+      if(result?.items)setCargo(result.items,result.selfId);
+      else if(mode==='pickup'){item.carrierId=cargoSelfId;syncCargoVisuals();}
+      else {item.carrierId=null;item.x=player.x;item.z=player.z;syncCargoVisuals();}
+      options.onHint?.(result?.message||(mode==='pickup'?'화물을 들었습니다. E를 눌러 내려놓으세요.':'화물을 내려놓았습니다.'));
+      return true;
+    }catch(error){options.onHint?.(error?.message||'화물을 옮기지 못했습니다.');return false;}
+  }
   const reduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const labels=element('div','position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:1;');
   labels.className='harbor-live-labels';host.append(labels);
@@ -768,7 +829,7 @@ export function mountWalk3D(container, options={}) {
   function getPresence(){
     const gesture=currentAction?.mode;
     const motion=seated?(gesture==='smoke'?'sit-smoke':'sit'):gesture&&['push','pull','cheer','coffee','phone','smoke','eat'].includes(gesture)?gesture:time-lastMove<.19?'walk':'idle';
-    return {x:+player.x.toFixed(3),z:+player.z.toFixed(3),yaw:+heading.toFixed(3),motion,
+    return {x:+player.x.toFixed(3),z:+player.z.toFixed(3),yaw:+heading.toFixed(3),motion,cargoId:carriedCargoId,
       actionId:gesture==='smoke'||gesture==='eat'?currentAction.id:localSignal && Date.now()-localSignal.at<(gesture==='cheer'?4100:2800)?localSignal.id:null};
   }
   function removePeer(id,p) {
@@ -833,6 +894,7 @@ export function mountWalk3D(container, options={}) {
     if(seated&&selfId)for(const [id,p] of peers)if(p.seat?.id===seated.id&&id<selfId){
       standUp();options.onHint?.('다른 산책자가 먼저 앉았어요.');break;
     }
+    syncCargoVisuals();
     notifySeat();
   }
   // Timetable memberships are historical. Only live position snapshots create avatars.
@@ -1125,8 +1187,9 @@ export function mountWalk3D(container, options={}) {
   on(window,'keydown',e=>{
     const key=e.key.toLowerCase();
     if(e.defaultPrevented || e.isComposing || e.ctrlKey || e.metaKey || e.altKey || blocked() || (e.target.closest?.('input,textarea,select,button,[contenteditable="true"]') && e.target!==canvas))return;
-    if(['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d'].includes(key)){keys.add(key);e.preventDefault();}
+    if(['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d','shift'].includes(key)){keys.add(key);e.preventDefault();}
     if((key==='e'||key==='enter')&&!e.repeat&&!gestureLocked()){
+      if(carriedCargoId||nearestCargo()){e.preventDefault();e.stopImmediatePropagation();interactCargo();return;}
       if(interactNearShrine()){e.preventDefault();}
       else if(near&&!['yard','departure','arrival'].includes(near)){e.preventDefault();options.onZone?.(near);}
     }
@@ -1155,13 +1218,15 @@ export function mountWalk3D(container, options={}) {
       dirVector.set(x*Math.cos(cameraYaw)-z*Math.sin(cameraYaw),0,-x*Math.sin(cameraYaw)-z*Math.cos(cameraYaw));
       if(dirVector.length()>1)dirVector.normalize();
       heading=turn(heading,Math.atan2(dirVector.x,dirVector.z),dt);
-      moved=moveWithCollision(dirVector.x*dt*WALK_SPEED,dirVector.z*dt*WALK_SPEED);
+      const running=keys.has('shift');
+      const speed=carriedCargoId?(running?CARRY_RUN_SPEED:CARRY_WALK_SPEED):(running?RUN_SPEED:WALK_SPEED);
+      moved=moveWithCollision(dirVector.x*dt*speed,dirVector.z*dt*speed);
       if(callFor('push')&&dirVector.x>.42&&player.x>=departure.anchor.x-.79&&Math.abs(player.z-departure.z)<=2.45){
         player.x=departure.anchor.x-.778;
         if(!touchLatched){touchLatched=true;options.onDockContact?.('push',departureCall.id);}
       }
     }else if(plan && !blocked()){
-      const speed=plan.quick?clamp(distance(player,plan.target)*.25+WALK_SPEED,WALK_SPEED,TRAVEL_SPEED):WALK_SPEED;
+      const speed=carriedCargoId?CARRY_WALK_SPEED:plan.quick?clamp(distance(player,plan.target)*.25+WALK_SPEED,WALK_SPEED,TRAVEL_SPEED):WALK_SPEED;
       moved=walk(dt*speed,dt);
     }
     if(moved>.001){lastMove=time;walkPhase+=Math.min(moved*GAIT_PER_UNIT,14*dt);}
@@ -1313,5 +1378,5 @@ export function mountWalk3D(container, options={}) {
   on(canvas,'webglcontextlost',e=>{e.preventDefault();if(!disposed)options.onHint?.('3D 화면 연결을 복구하고 있어요.');});
   joystick.style.display=active&&touchDevice?'flex':'none';local.group.position.copy(player);local.group.rotation.y=heading;
   bindVessels();updateShadow(local);adjustView(1);frame=requestAnimationFrame(tick);
-  return {available:true,renderer:software?'canvas3d':'webgl',getZonePosition:id=>zones[id],getNearbyShrine:()=>nearbyShrine,watchShark,getPresence,setLivePeers,goToPeer,goTo,goToWish,actAtDock,act,smoke,eatFishcake,toggleSeat,sitAt,standUp,getSeatState,cheer,sayChat,canCheerHere,approachGuardian,interactNearShrine,home,zoomBy,setActive,setProfile,setPeers,setNeighbors,setVessel,bindVessels,setBoard:state=>marquee.setBoard(state),setDepartures:(calls,terminal)=>office.setDepartures(calls,terminal),replayDeparture:()=>office.replay(),setWishes:(call,wishes)=>court.setWishes(call,wishes),setWeather,setLight,celebrate,dispose,destroy:dispose};
+  return {available:true,renderer:software?'canvas3d':'webgl',getZonePosition:id=>zones[id],getNearbyShrine:()=>nearbyShrine,watchShark,getPresence,setLivePeers,goToPeer,goTo,goToWish,actAtDock,act,smoke,eatFishcake,toggleSeat,sitAt,standUp,getSeatState,cheer,sayChat,canCheerHere,approachGuardian,interactNearShrine,home,zoomBy,setActive,setProfile,setPeers,setNeighbors,setVessel,bindVessels,setBoard:state=>marquee.setBoard(state),setDepartures:(calls,terminal)=>office.setDepartures(calls,terminal),replayDeparture:()=>office.replay(),setWishes:(call,wishes)=>court.setWishes(call,wishes),setWeather,setLight,celebrate,setCargo,dispose,destroy:dispose};
 }
