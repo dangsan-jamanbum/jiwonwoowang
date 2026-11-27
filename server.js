@@ -59,6 +59,13 @@ for(const [index,[kind,name]] of cancelCargoTypes.entries()){
   const copies=index%2===0?4:3;
   for(let copy=0;copy<copies;copy++)cargoBlueprints.push({effect:'cancel',kind,name,copy:copy+1});
 }
+// Mix all item types before assigning map positions so identical items never spawn in batches.
+let cargoMixSeed=0x31d7a9;
+const cargoMixRandom=()=>{cargoMixSeed=(cargoMixSeed*1664525+1013904223)>>>0;return cargoMixSeed/4294967296;};
+for(let i=cargoBlueprints.length-1;i>0;i--){
+  const j=Math.floor(cargoMixRandom()*(i+1));
+  [cargoBlueprints[i],cargoBlueprints[j]]=[cargoBlueprints[j],cargoBlueprints[i]];
+}
 const cargoSpawns=makeCargoSpawnPoints(cargoBlueprints.length,48);
 const cargoItems=cargoBlueprints.map((item,i)=>({
   id:'cargo-pnc-'+String(i+1).padStart(4,'0'),...item,
