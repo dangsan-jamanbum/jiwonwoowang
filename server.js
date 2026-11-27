@@ -21,55 +21,102 @@ let calls = [
   { id:'demo-pnit-001', terminal:'pnit', name:'ATD 북항 연습선', voy:'DEMO-002', outboundVoy:'DEMO-002', inboundVoy:'DEMO-002', carrierVoy:'DEMO-002', berth:'연습 부두', berthPhase:'alongside', etd:null, etb:null, atd:null, atdVerified:false, isDemo:true }
 ];
 
-const PNC_BERTH_URL='https://svc.pncport.com/info/CMS/Ship/showberthCLT.pnc?cltCode=&mCode=MN019';
+const PNC_BERTH_URL='https://svc.pncport.com/info/CMS/Ship/Info.pnc?mCode=MN014';
 const PNC_CACHE_MS=2*60*1000;
-let pncCache={checkedAt:0,calls:[],source:{kind:'demo',stale:false,label:'실시간 연결 대기'}};
+let pncCache={checkedAt:0,calls:[],source:{kind:'demo',stale:true,label:'공식 자료 연결 전'}};
 let pncRefresh=null;
 
 function decodeHtml(value){
-  return String(value||'').replace(/&nbsp;|&#160;/gi,' ')
+  return String(value??'').replace(/&nbsp;|&#160;/gi,' ')
     .replace(/&amp;/gi,'&').replace(/&quot;/gi,'"').replace(/&#39;|&apos;/gi,"'")
     .replace(/&lt;/gi,'<').replace(/&gt;/gi,'>');
 }
-function parsePncSchedule(html){
-  const plain=decodeHtml(String(html)
-    .replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi,' ')
-    .replace(/<br\s*\/?>|<\/(?:tr|td|th|div|p|li|h[1-6])\s*>/gi,'\n')
-    .replace(/<[^>]+>/g,' '));
-  const lines=plain.split(/\r?\n/).map(v=>v.replace(/\s+/g,' ').trim()).filter(Boolean);
+function cellText(html){
+  return decodeHtml(String(html??'').replace(/<br\\s*\\/?\\s*>/gi,' ')
+    .replace(/<[^>]*>/g,' ').replace(/\\s+/g,' ')).trim();
+}
+function pncDate(value){
+  const s=String(value??'').trim();
+  if(!s||s==='-'||s==='N/A')return null;
+  if(/^20\\d{2}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}/.test(s))return new Date(s.replace(' ','T')+':00+09:00').toISOString();
+  const d=new Date(s);
+  return Number.isNaN(d.getTime())?null:d.toISOString();
+}
+function normalizePncCalls(rawCalls){
+  const checkedAt=new Date().toISOString();
+  return rawCalls.map((c)=>{
+    const loading=c.loading||{};
+    const terminalVoy=String(c.terminalVoy||c.voy||'').trim();
+    const code=(terminalVoy.split('/')[0]||terminalVoy).trim();
+    const year=(terminalVoy.match(/(20\\d{2})/)||[])[1]||String(new Date().getFullYear());
+    const carrier=String(c.carrierVoy||c.voy||'').split('/');
+    const etb=c.etb||null,etd=c.etd||null;
+    return {
+      ...c,id:c.id||'official.busan.pnc.'+code+'.'+year,terminal:'pnc',port:'busan',
+      name:String(c.name||'').trim(),voy:c.outboundVoy||carrier[1]||carrier[0]||code,
+      carrierVoy:c.carrierVoy||c.voy||'',terminalVoy,inboundVoy:c.inboundVoy||carrier[0]||'',
+      outboundVoy:c.outboundVoy||carrier[1]||carrier[0]||'',berth:c.berth||'미정',
+      etb,etd,atb:c.atb||null,atd:c.atd||null,atdVerified:!!c.atdVerified,
+      berthPhase:c.berthPhase||'scheduled',rawStatus:c.rawStatus||'예정',
+      status:c.status||'접안 예정',isDemo:false,
+      loading:{...loading,plan:loading.plan??null,workTotal:loading.workTotal??null,
+        completed:loading.completed??null,remainingVan:loading.remainingVan??null,
+        remainingMoves:loading.remainingMoves??null},
+      source:c.source||'부산신항만 PNC 선석배정현황',
+      sourceUrl:c.sourceUrl||PNC_BERTH_URL,updatedAt:c.updatedAt||null,
+      checkedAt:c.checkedAt||checkedAt
+    };
+  }).filter(c=>c.name&&c.terminalVoy);
+}
+function parsePncSchedule(payload){
+  const source=String(payload??'').trim();
+  // 일부 PNC 중계 응답은 calls 배열을 가진 JSON으로 제공된다.
+  if(source.startsWith('{')||source.startsWith('[')){
+    const parsed=JSON.parse(source);
+    const rows=Array.isArray(parsed)?parsed:parsed.calls;
+    if(Array.isArray(rows)&&rows.length)return normalizePncCalls(rows);
+  }
+  // 공식 MN014 페이지의 선석배정 표: No., 모선명, 모선코드,
+  // 선사항차, 운항선사, 항로, 접안방향, 접안/예정, 출항/예정, 선석...
+  const rows=[...source.matchAll(/<tr\\b[^>]*>([\\s\\S]*?)<\\/tr>/gi)];
   const found=[];
-  const voyRe=/^([A-Z0-9-]{4,})\s*\/\s*(20\d{2})$/i;
-  for(let i=1;i<lines.length-3;i++){
-    const match=lines[i].match(voyRe);
-    if(!match)continue;
-    const name=lines[i-1].replace(/\s+/g,' ').trim();
-    const route=lines[i+1]||'';
-    const stats=lines.slice(i+2,i+6).join(' ').match(/D\s*:\s*\(?([\d,]+)\)?[\s,;]*L\s*:\s*\(?([\d,]+)\)?[\s,;]*S\s*:\s*\(?([\d,]+)\)?[\s,;]*Y\s*:\s*\(?([\d,]+)\)?/i);
-    if(!/^[A-Z0-9][A-Z0-9 .'-]{2,60}$/i.test(name)||!route.includes('/'))continue;
-    const n=v=>Number(String(v||'').replace(/,/g,''));
-    const discharge=stats?n(stats[1]):null,load=stats?n(stats[2]):null,shift=stats?n(stats[3]):null,yard=stats?n(stats[4]):null;
-    const code=route.split('/').pop().trim().toUpperCase();
+  for(const row of rows){
+    const cells=[...row[1].matchAll(/<t[dh]\\b[^>]*>([\\s\\S]*?)<\\/t[dh]>/gi)].map(m=>cellText(m[1]));
+    if(cells.length<10||!/^\\d+$/.test(cells[0]))continue;
+    const name=cells[1],terminalVoy=cells[2],carrierVoy=cells[3],operator=cells[4],route=cells[5];
+    if(!name||!/[A-Z0-9-]+\\s*\\/\\s*20\\d{2}/i.test(terminalVoy))continue;
+    const [inboundVoy='',outboundVoy='']=carrierVoy.split('/').map(v=>v.trim());
+    const etb=pncDate(cells[7]),etd=pncDate(cells[8]);
+    const now=Date.now(),etbMs=etb?Date.parse(etb):NaN,etdMs=etd?Date.parse(etd):NaN;
+    const berthPhase=Number.isFinite(etdMs)&&now>etdMs?'departed':
+      Number.isFinite(etbMs)&&now>=etbMs?'alongside':'scheduled';
+    const terminalCode=terminalVoy.split('/')[0].trim();
+    const year=(terminalVoy.match(/20\\d{2}/)||[])[0];
+    const discharge=Number(String(cells[11]||'').replace(/,/g,''))||0;
+    const load=Number(String(cells[12]||'').replace(/,/g,''))||0;
+    const shift=Number(String(cells[13]||'').replace(/,/g,''))||0;
     found.push({
-      id:'pnc-'+match[1].toLowerCase(),terminal:'pnc',name,voy:match[1],outboundVoy:match[1],inboundVoy:match[1],carrierVoy:match[1],
-      berth:'PNC 선석 배정',berthPhase:'planned',etb:null,etd:null,atd:null,atdVerified:false,isDemo:false,
-      operator:route.split('/')[0]||'',route:route.split('/').slice(1,-1).join('/')||'',scheduleCode:code,
-      loading:{plan:load,completed:null,remainingVan:null,discharge,shift,yard,workTotal:(discharge??0)+(load??0)}
+      id:'official.busan.pnc.'+terminalCode+'.'+year,name,voy:outboundVoy||inboundVoy,
+      carrierVoy,terminalVoy,inboundVoy,outboundVoy,operator,route,port:'busan',terminal:'pnc',
+      berth:cells[9]||'미정',loading:{plan:load,workTotal:discharge+load,completed:null,
+        remainingVan:null,remainingMoves:null,workUnit:null,completedUnit:null,
+        planSourceUrl:PNC_BERTH_URL,workSourceUrl:null,checkedAt:new Date().toISOString(),workCheckedAt:null},
+      eta:null,etb,atb:null,etd,atd:null,atdVerified:false,berthPhase,
+      rawStatus:berthPhase==='departed'?'출항':'예정',
+      status:berthPhase==='departed'?'출항':'접안 예정',isDemo:false,
+      source:'부산신항만 PNC 선석배정현황',sourceUrl:PNC_BERTH_URL,
+      updatedAt:pncDate(cells[16]),checkedAt:new Date().toISOString(),atbSourceUrl:null
     });
   }
   const unique=[...new Map(found.map(c=>[c.id,c])).values()];
-  if(!unique.length)throw new Error('PNC 선석 배정표에서 선박 항목을 찾지 못했습니다.');
+  if(!unique.length)throw new Error('PNC 공식 MN014 선석배정 표에서 선박 행을 찾지 못했습니다.');
   return unique;
 }
 function pncFallback(){
-  const now=Date.now();
-  return [
-    {id:'demo-pnc-fallback-001',terminal:'pnc',name:'ATD PNC 시범 컨테이너선',voy:'DEMO-101',outboundVoy:'DEMO-101',inboundVoy:'DEMO-101',carrierVoy:'DEMO-101',berth:'예시 선석 1',berthPhase:'planned',etb:null,etd:null,atd:null,atdVerified:false,isDemo:true,loading:{plan:1200,completed:640,remainingVan:560,workTotal:1200}},
-    {id:'demo-pnc-fallback-002',terminal:'pnc',name:'ATD 신항 연습선',voy:'DEMO-102',outboundVoy:'DEMO-102',inboundVoy:'DEMO-102',carrierVoy:'DEMO-102',berth:'예시 선석 2',berthPhase:'berthed',etb:null,etd:null,atd:null,atdVerified:false,isDemo:true,loading:{plan:860,completed:420,remainingVan:440,workTotal:860}},
-    {id:'demo-pnc-fallback-003',terminal:'pnc',name:'ATD 항만 훈련선',voy:'DEMO-103',outboundVoy:'DEMO-103',inboundVoy:'DEMO-103',carrierVoy:'DEMO-103',berth:'예시 선석 3',berthPhase:'planned',etb:null,etd:null,atd:null,atdVerified:false,isDemo:true,loading:{plan:540,completed:0,remainingVan:540,workTotal:540}}
-  ];
+  return [];
 }
 function updateCalls(){
-  const pnc=pncCache.calls.length?pncCache.calls:pncFallback();
+  const pnc=pncCache.calls;
   const pnit=calls.filter(c=>c.terminal==='pnit');
   calls=[...pnc,...pnit];
 }
@@ -78,16 +125,25 @@ async function getPncSchedule(force=false){
   if(pncRefresh)return pncRefresh;
   pncRefresh=(async()=>{
     try{
-      const response=await fetch(PNC_BERTH_URL,{headers:{'User-Agent':'Mozilla/5.0 ATD-Harbor/1.0','Accept':'text/html'},signal:AbortSignal.timeout(9000)});
+      const response=await fetch(PNC_BERTH_URL,{headers:{
+        'User-Agent':'Mozilla/5.0 (compatible; ATD-Harbor/1.0)',
+        'Accept':'text/html,application/json;q=0.9,*/*;q=0.8',
+        'Referer':'https://svc.pncport.com/info/CMS/Ship/Info.pnc?mCode=MN014'
+      },signal:AbortSignal.timeout(15000)});
       if(!response.ok)throw new Error('PNC 응답 '+response.status);
-      const html=await response.text();
-      const parsed=parsePncSchedule(html);
+      const body=await response.text();
+      const parsed=parsePncSchedule(body);
       const checkedAt=new Date().toISOString();
-      pncCache={checkedAt:Date.now(),calls:parsed,source:{kind:'official',label:'부산신항 PNC 운영사 공개 선석 배정표',checkedAt,updatedAt:checkedAt,stale:false,partial:false,url:PNC_BERTH_URL}};
+      pncCache={checkedAt:Date.now(),calls:parsed,source:{kind:'official',label:'부산신항 PNC 운영사 공식 선석배정현황',checkedAt,updatedAt:checkedAt,stale:false,partial:false,url:PNC_BERTH_URL}};
     }catch(error){
-      console.warn('[PNC schedule] live lookup failed:',error.message);
+      console.warn('[PNC schedule] official lookup failed:',error.message);
       const checkedAt=new Date().toISOString();
-      pncCache={checkedAt:Date.now(),calls:pncFallback(),source:{kind:'demo',label:'실시간 연결 대기 · 예시 자료',checkedAt,updatedAt:checkedAt,stale:false,partial:true,error:'공식 자료를 가져오지 못해 예시 자료를 표시합니다.'}};
+      pncCache={...pncCache,checkedAt:Date.now(),source:{
+        kind:pncCache.calls.length?'official':'unavailable',
+        label:pncCache.calls.length?'공식 자료 갱신 지연 · 마지막 수신 자료':'PNC 공식 자료 연결 실패',
+        checkedAt,updatedAt:pncCache.source?.updatedAt||null,
+        stale:true,partial:false,error:'공식 PNC 자료를 새로 가져오지 못했습니다.'
+      }};
     }
     updateCalls();
     return pncCache;
