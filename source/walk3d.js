@@ -10,6 +10,7 @@ import { CHEER_PEAKS, CHEER_DURATION, cheerPose, mountCheers } from './shrine-ge
 import { mountTerminalMarquee, TERMINAL_WALL, TERMINAL_WALL_BOUNDS } from './terminal-marquee.js?v=16';
 import { buildDepartureOffice } from './departure-office.js?v=24';
 import { buildHarborLife } from './harbor-life.js?v=18';
+import { buildPortVehicles } from './port-vehicles.js?v=1';
 
 const { Vector3: V3 } = THREE;
 const clamp = (v, lo, hi) => Math.min(hi,Math.max(lo,v));
@@ -203,6 +204,7 @@ export function mountWalk3D(container, options={}) {
   const office=buildDepartureOffice(THREE,scene,{onAnnouncement:meta=>options.onDepartureAnnouncement?.(meta)});
   const marquee=mountTerminalMarquee(THREE,scene,renderer);
   const harborLife=buildHarborLife(THREE,scene);
+  const portVehicles=buildPortVehicles(THREE,scene);
   zones.departureOffice=office.approach;zones.eomuk=harborLife.approach;zones.shark=harborLife.sharkWatch;
   const canWalk=(x,z)=>set.canWalk(x,z) && !court.blocks(x,z) && !office.blocks(x,z) && !harborLife.blocks(x,z);
   let navigation;
@@ -569,9 +571,9 @@ export function mountWalk3D(container, options={}) {
     const n=Math.max(1,Math.ceil(Math.hypot(dx,dz)/.18));
     for(let i=0;i<n;i++){
       const x=player.x+dx/n,z=player.z+dz/n;
-      if(canWalk(x,z)) {player.x=x;player.z=z;}
-      else if(canWalk(x,player.z))player.x=x;
-      else if(canWalk(player.x,z))player.z=z;
+      if(canWalk(x,z)&&!portVehicles.blocks(x,z)) {player.x=x;player.z=z;}
+      else if(canWalk(x,player.z)&&!portVehicles.blocks(x,player.z))player.x=x;
+      else if(canWalk(player.x,z)&&!portVehicles.blocks(player.x,z))player.z=z;
       else break;
     }
     player.y=measuredGround(player.x,player.z);
@@ -1353,7 +1355,7 @@ export function mountWalk3D(container, options={}) {
     if(celebration>7)feedback.hidden=true;
     set.update?.({time,night,push:shipPush,pull:shipPull,departure:0});
     court.update(time,night,reduceMotion);
-    marquee.update(time);office.update(time,distance(player,office.approach)<8);harborLife.update(time,night,reduceMotion);
+    marquee.update(time);office.update(time,distance(player,office.approach)<8);harborLife.update(time,night,reduceMotion);portVehicles.update(time);
   }
   let frame=0,last=performance.now();
   function tick(stamp) {
@@ -1368,7 +1370,7 @@ export function mountWalk3D(container, options={}) {
   }
   function dispose() {
     if(disposed)return;disposed=true;cancelAnimationFrame(frame);cancelPlan();observer.disconnect();events.abort();
-    court.destroy();marquee.destroy();office.dispose();harborLife.dispose();
+    court.destroy();marquee.destroy();office.dispose();harborLife.dispose();portVehicles.destroy();
     cheers.clear();
     const geometries=new Set(),materials=new Set(),textures=new Set([smokeTex]);
     scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);for(const m of Array.isArray(o.material)?o.material:o.material?[o.material]:[]){materials.add(m);for(const v of Object.values(m))if(v?.isTexture)textures.add(v);}});
