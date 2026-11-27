@@ -372,9 +372,10 @@ export function mountWalk3D(container, options={}) {
       for(const x of [-.25,.25])for(const z of [-.18,.18])
         cargoPart(g,new THREE.CylinderGeometry(.07,.07,.07,10),cargoMaterials.cloud,x,.07,z);
     }
-    const cancel=item.effect==='cancel';
-    const auraMat=cancel?cargoMaterials.cancelAura:cargoMaterials.delayAura;
-    const glowMat=cancel?cargoMaterials.cancelGlow:cargoMaterials.delayGlow;
+    // Green is always cancellation/support; red is always delay/penalty.
+    const isCancel=item.effect==='cancel';
+    const auraMat=isCancel?cargoMaterials.cancelAura:cargoMaterials.delayAura;
+    const glowMat=isCancel?cargoMaterials.cancelGlow:cargoMaterials.delayGlow;
     const glow=new THREE.Mesh(new THREE.CircleGeometry(.86,28),glowMat);
     glow.name='cargo-aura-glow';glow.rotation.x=-Math.PI/2;glow.position.y=.018;g.add(glow);
     const aura=new THREE.Mesh(new THREE.TorusGeometry(.70,.045,7,32),auraMat);
@@ -559,6 +560,23 @@ export function mountWalk3D(container, options={}) {
   groundMarker.rotation.x=-Math.PI/2;groundMarker.visible=false;scene.add(groundMarker);
   let markerTimer=0;
   function marker(p) {groundMarker.position.set(p.x,measuredGround(p.x,p.z)+.055,p.z);groundMarker.visible=true;markerTimer=time;}
+
+  // Permanent unloading target: exact same center/radius used by the server delivery check.
+  const cargoDropPoint=new THREE.Vector3(10.8,0,5);
+  const cargoDropGround=measuredGround(cargoDropPoint.x,cargoDropPoint.z);
+  const cargoDropRing=new THREE.Mesh(
+    new THREE.TorusGeometry(4.28,.075,8,72),
+    new THREE.MeshBasicMaterial({color:0x43f39a,emissive:0x168b54,emissiveIntensity:.7,transparent:true,opacity:.72,depthWrite:false})
+  );
+  cargoDropRing.rotation.x=Math.PI/2;cargoDropRing.position.set(cargoDropPoint.x,cargoDropGround+.09,cargoDropPoint.z);scene.add(cargoDropRing);
+  const cargoDropSquare=new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(8.55,.025,8.55)),
+    new THREE.LineBasicMaterial({color:0x9fffd0,transparent:true,opacity:.52,depthWrite:false})
+  );
+  cargoDropSquare.position.set(cargoDropPoint.x,cargoDropGround+.12,cargoDropPoint.z);scene.add(cargoDropSquare);
+  const cargoDropLabel=element('div','position:absolute;left:0;top:0;transform:translate(-50%,-100%);display:none;white-space:nowrap;padding:7px 13px;border:1px solid #8fffc2;border-radius:18px;background:rgba(7,42,31,.92);color:#d9ffe9;font:800 14px/1.25 system-ui;letter-spacing:-.2px;box-shadow:0 0 18px #42f39a88,0 3px 10px #001b16aa;text-shadow:0 1px 2px #001b16;z-index:5;');
+  cargoDropLabel.textContent='화물 하역 구역';
+  host.append(cargoDropLabel);
   const feedback=element('div','position:absolute;top:15%;left:50%;transform:translateX(-50%);pointer-events:none;padding:7px 17px;white-space:nowrap;border:1px solid #fae7a0;border-radius:20px;background:#f9dd88;color:#6e491d;font:800 15px/1.4 system-ui;box-shadow:0 4px 18px #2b331f2b;');
   feedback.hidden=true;host.append(feedback);
   let ceremony=-1e4;
@@ -1497,6 +1515,24 @@ export function mountWalk3D(container, options={}) {
       else {p.mesh.position.copy(p.base);p.mesh.position.y+=f*.55;p.mesh.material.opacity=Math.min(1,(1-f)*3);const s=.68+.23*Math.sin(Math.PI*f);p.mesh.scale.set(s*p.aspect,s,1);}
     }
     if(groundMarker.visible){const f=clamp((time-markerTimer)/1.15,0,1);groundMarker.scale.setScalar(1+f);groundMarker.material.opacity=.82*(1-f);if(f>=1)groundMarker.visible=false;}
+    const carrying=Boolean(carriedCargoId);
+    const targetPulse=.72+.22*Math.sin(time*(carrying?5.8:2.1));
+    cargoDropRing.material.opacity=carrying?Math.min(1,targetPulse+.16):targetPulse*.72;
+    cargoDropRing.material.emissiveIntensity=carrying?1.65:0.62;
+    cargoDropSquare.material.opacity=carrying?.92:.48;
+    cargoDropSquare.material.color.setHex(carrying?0x65ffad:0x9fffd0);
+    cargoDropRing.scale.setScalar(carrying?1+.035*Math.sin(time*5.8):1);
+    cargoDropLabel.style.display=carrying?'block':'none';
+    if(carrying){
+      const labelWorld=new THREE.Vector3(cargoDropPoint.x,cargoDropGround+2.55,cargoDropPoint.z).project(camera);
+      const labelVisible=labelWorld.z>-1&&labelWorld.z<1&&Math.abs(labelWorld.x)<1.15&&Math.abs(labelWorld.y)<1.15;
+      cargoDropLabel.style.display=labelVisible?'block':'none';
+      if(labelVisible){
+        cargoDropLabel.style.left=((labelWorld.x*.5+.5)*host.clientWidth)+'px';
+        cargoDropLabel.style.top=((-labelWorld.y*.5+.5)*host.clientHeight)+'px';
+        cargoDropLabel.textContent='↓ 여기에 놓기 (E)';
+      }
+    }else cargoDropLabel.textContent='화물 하역 구역';
     const celebration=time-ceremony;
     for(let i=confetti.length-1;i>=0;i--){const c=confetti[i];c.m.position.set(c.x+Math.sin(celebration+c.phase)*.8,c.y-celebration*c.fall,c.z+Math.cos(celebration+c.phase)*.4);c.m.rotation.set(celebration*.6,c.phase+celebration,celebration*.95);
       if(c.m.position.y<0||celebration>9){scene.remove(c.m);c.m.geometry.dispose();c.m.material.dispose();confetti.splice(i,1);}
@@ -1518,7 +1554,7 @@ export function mountWalk3D(container, options={}) {
     if(software)marquee.paintView?.(camera,width,height);
   }
   function dispose() {
-    if(disposed)return;disposed=true;cancelAnimationFrame(frame);cancelPlan();observer.disconnect();events.abort();
+    if(disposed)return;disposed=true;cancelAnimationFrame(frame);cancelPlan();observer.disconnect();events.abort();cargoDropLabel.remove();scene.remove(cargoDropRing,cargoDropSquare);cargoDropRing.geometry.dispose();cargoDropRing.material.dispose();cargoDropSquare.geometry.dispose();cargoDropSquare.material.dispose();
     court.destroy();marquee.destroy();office.dispose();harborLife.dispose();portVehicles.destroy();
     cheers.clear();
     const geometries=new Set(),materials=new Set(),textures=new Set([smokeTex]);
