@@ -27,7 +27,7 @@ try{sound=localStorage.getItem('atd.sound')==='on';}catch{}
 let world=null, worldReady=null, playing=false, nearby=null, actionBusy=false, dockAnimating=false, lastVictory='', lookToken=0;
 let scheduleFailed=false, dockLog=null, shrineNearby=null,seatState={seated:false,available:false};
 const app=$('#harbor-app'), loading=$('#loading'), hud=$('#walk-hud');
-const places={departure:['출항 부두','','hand'],arrival:['수입 부두','모선 당기기','anchor'],shrine:['기원 신전','출항 삼창','star'],control:['선적 안내소','선적 안내 듣기','radar'],departureOffice:['출항 공표소','출항 공표 듣기','radio'],eomuk:['부산 어묵','어묵 먹기','coffee'],shark:['북항이','','focus'],smoking:['흡연 구역','담배 피우기','bench'],yard:['컨테이너 야드','','containers']};
+const places={departure:['출항 부두','','hand'],arrival:['수입 부두','모선 당기기','anchor'],shrine:['기원 신전','출항 삼창','star'],control:['선적 안내소','선적 안내 듣기','radar'],departureOffice:['출항 공표소','출항 공표 듣기','radio'],eomuk:['부산 어묵','어묵 먹기','coffee'],shark:['북항이','낚시 / 상어 줍기','focus'],smoking:['흡연 구역','담배 피우기','bench'],yard:['컨테이너 야드','','containers']};
 const dialogue=mountConversations($('#dialogue-host'),{getState:()=>state,onOpen:(zone,options)=>zone==='shrine'?cheerGuardian(options?.initialGuardian):openPanel(zone,null,options),onClose:()=>{renderHud();focusWorld();}});
 let chatTerminal=null;
 const openingMessages=[];
