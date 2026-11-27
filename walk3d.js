@@ -1,1 +1,1 @@
-export * from './source/walk3d.js?v=25';
+export * from './source/walk3d.js?v=26';
