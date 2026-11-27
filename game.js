@@ -1,6 +1,6 @@
 import {mountHarborChat} from './harbor-chat.js?v=22';
 import {sessionHeaders} from './browser-session.js';
-import {connectPresence} from './presence-client.js?v=22';
+import {connectPresence} from './presence-client.js?v=23';
 import {mountConversations} from './conversations.js?v=19';
 import {renderShrine} from './shrine.js';
 import {renderControl} from './control.js?v=22';
