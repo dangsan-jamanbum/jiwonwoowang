@@ -338,9 +338,9 @@ export function mountWalk3D(container, options={}) {
         data.emission=emission;data.source.copy(wisp?emberAt:mouthAt);
         data.forward.copy(breathForward);
       }
-      const travel=wisp ? .045*t : .08+1.02*t;
+      const travel=wisp?.045*t:.08+1.02*t;
       puff.position.copy(data.source).addScaledVector(data.forward,travel);
-      puff.position.x+=(wisp ? .18 : .32)*t+Math.sin(t*4.4+i)*t*.042;
+      puff.position.x+=(wisp?.18:.32)*t+Math.sin(t*4.4+i)*t*.042;
       puff.position.z+=.08*t;
       puff.position.y+=(wisp?.79:.29)*t+.30*t*t;
       const fade=Math.min(1,age*4,(SMOKE_DURATION-age)*3);
@@ -728,25 +728,6 @@ export function mountWalk3D(container, options={}) {
     const front=spot.front||courtFront;
     return (p.x-spot.x)*front.x+(p.z-spot.z)*front.z>1.25&&distance(p,spot)<5.45;
   }
-  function nextToShrine(){
-    let nearest=null,best=Infinity;
-    const consider=(kind,id,point)=>{
-      const d=distance(player,point);
-      if(d<best){best=d;nearest={kind,id};}
-    };
-    for(const [id,wish] of Object.entries(court.wishEntries||{})){
-      const radius=wish.radius||2.3;
-      if(distance(player,wish)<=radius)consider('wish',id,wish);
-    }
-    for(const spot of court.spots||[]){
-      if(guardianFront(player,spot))consider('guardian',spot.id,spot);
-    }
-    const shrine=zones.shrine;
-    if(shrine&&distance(player,shrine)<=(shrine.radius||3.8)){
-      consider('court','court',shrine);
-    }
-    return nearest;
-  }
   const atCourt=(p)=>canWalk(p.x,p.z)&&(distance(p,zones.shrine)<zones.shrine.radius || court.spots.some(s=>guardianFront(p,s)));
   const canCheerHere=()=>!!(active&&!disposed&&!gestureLocked()&&!aligning&&atCourt(player));
   async function approachGuardian(id) {
@@ -1017,272 +998,320 @@ export function mountWalk3D(container, options={}) {
     cameraGuard.constrain(cameraOrigin,desired,radius,desired,camera.position,true);
     stopCameraAtWalls(cameraOrigin,desired,radius);
     if(initialCamera){camera.position.copy(desired);lookAt.copy(aim);initialCamera=false;}
-
-    camera.position.lerp(desired,initialCamera?1:1-Math.exp(-dt*7));
-    lookAt.lerp(aim,1-Math.exp(-dt*9));
+    else {const s=1-Math.exp(-dt*7.3);camera.position.lerp(desired,s);lookAt.lerp(aim,s);}
+    // Interpolation between two safe positions can cross a moving bow or a
+    // convex corner. Validate the actual eye position immediately before draw.
+    cameraGuard.constrain(cameraOrigin,camera.position,radius,camera.position);
+    stopCameraAtWalls(cameraOrigin,camera.position,radius);
     camera.lookAt(lookAt);
   }
-
-  const blocked=()=>!active||disposed;
-  let frameHandle=0,lastFrame=0,frameCount=0;
-  let pointerDown=null,dragging=false,lastPointerX=0,lastPointerY=0;
-  const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2(),groundPlane=new THREE.Plane(new V3(0,1,0),0),hitPoint=new V3();
-  const keyDown=e=>{
-    if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','w','a','s','d','W','A','S','D'].includes(e.key) && !/INPUT|TEXTAREA|SELECT/.test(e.target?.tagName||''))e.preventDefault();
-    keys.add(e.key.toLowerCase());
-    if(e.key==='Escape'){cancelPlan();keys.clear();}
-    if((e.key==='e'||e.key==='Enter')&&!e.repeat){
-      if(near==='smoking')toggleSeat();
-      else if(near==='eomuk')eatFishcake();
-      else if(near==='shark')watchShark();
-      else if(near==='departureOffice')replayDeparture();
-      else if(near==='arrival')actAtDock('pull');
-      else if(near==='departure')actAtDock('push');
-      else if(near==='shrine')options.onHint?.('수호자 앞에서 삼창할 수 있어요.');
+  const ray=new THREE.Raycaster(),pointer=new THREE.Vector2(),walkPlane=new THREE.Plane(new V3(0,1,0),0);
+  const pointers=new Map();
+  let gesture=null,pinch=null;
+  const blocked=()=>!active || !!document.querySelector('dialog[open],.atd-conversation:not([hidden]):not([data-passive="true"])');
+  function nextToShrine() {
+    let best=null,range=Infinity;
+    for(const [side,entry] of Object.entries(court.wishEntries||{})){
+      const d=distance(player,entry);if(d<entry.radius && d<range){best={kind:'wish',id:side};range=d;}
     }
-  };
-  const keyUp=e=>keys.delete(e.key.toLowerCase());
-  const pointerStart=e=>{
-    if(disposed)return;
-    pointerDown={x:e.clientX,y:e.clientY,id:e.pointerId,at:performance.now()};
-    lastPointerX=e.clientX;lastPointerY=e.clientY;dragging=false;
-    try{canvas.setPointerCapture(e.pointerId);}catch{}
-  };
-  const pointerMove=e=>{
-    if(!pointerDown||pointerDown.id!==e.pointerId)return;
-    const dx=e.clientX-lastPointerX,dy=e.clientY-lastPointerY;
-    if(Math.hypot(e.clientX-pointerDown.x,e.clientY-pointerDown.y)>5)dragging=true;
-    if(dragging){
-      cameraYaw-=dx*.0065;
-      cameraPitch=clamp(cameraPitch+dy*.004,-.02,1.02);
-      openingVista=false;if(railView==='shark')railView=null;
-      cancelPlan();lastMove=time;
+    for(const spot of court.spots){const d=distance(player,spot);if(d<range&&guardianFront(player,spot)){range=d;best={kind:'guardian',id:spot.id};}}
+    if(best)return best;
+    const {left,right}=court.wishEntries;
+    if(player.x>=right.x&&player.x<=left.x&&player.z>=zones.shrine.z-zones.shrine.radius*.5&&player.z<=left.z+1&&canWalk(player.x,player.z)){
+      const closest=court.spots.reduce((a,b)=>distance(player,a)<=distance(player,b)?a:b);
+      return {kind:'court',id:closest.id};
     }
-    lastPointerX=e.clientX;lastPointerY=e.clientY;
-  };
-  const pointerEnd=e=>{
-    if(!pointerDown||pointerDown.id!==e.pointerId)return;
-    const moved=dragging,elapsed=performance.now()-pointerDown.at;
-    if(!moved&&elapsed<420&&active&&!disposed){
-      const rect=canvas.getBoundingClientRect();
-      pointer.set(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);
-      raycaster.setFromCamera(pointer,camera);
-      if(raycaster.ray.intersectPlane(groundPlane,hitPoint)&&canWalk(hitPoint.x,hitPoint.z)){
-        autopilot({x:hitPoint.x,z:hitPoint.z},null,false,false);
-      }
-    }
-    pointerDown=null;dragging=false;
-  };
-  const wheel=e=>{e.preventDefault();zoomBy(e.deltaY>0?.09:-.09);};
-  const context=e=>e.preventDefault();
-  const blur=()=>{keys.clear();pointerDown=null;dragging=false;};
-  canvas.addEventListener('pointerdown',pointerStart);
-  canvas.addEventListener('pointermove',pointerMove);
-  canvas.addEventListener('pointerup',pointerEnd);
-  canvas.addEventListener('pointercancel',pointerEnd);
-  canvas.addEventListener('wheel',wheel,{passive:false});
-  canvas.addEventListener('contextmenu',context);
-  window.addEventListener('keydown',keyDown);
-  window.addEventListener('keyup',keyUp);
-  window.addEventListener('blur',blur);
-  canvas.addEventListener('keydown',keyDown);
-  canvas.addEventListener('keyup',keyUp);
-
-  function updateAction(dt){
-    if(!currentAction)return;
-    const action=currentAction,elapsed=time-action.start;
-    if(action.mode==='push'||action.mode==='pull'){
-      const duration=PALM_DURATION;
-      const pose=slapPoseAtFrame(action,elapsed);
-      local.group.userData.atdGesture=pose;
-      dispatchContacts(local,action,action.mode,elapsed,true,true);
-      if(elapsed>=duration){
-        const mode=action.mode;currentAction=null;localSignal=null;local.group.userData.atdGesture=null;
-        options.onDockGestureEnd?.(mode);
-      }
-    }else if(action.mode==='cheer'){
-      const duration=CHEER_DURATION,pose=cheerPose(elapsed);
-      local.group.userData.atdGesture=pose;
-      while(action.beats<CHEER_PEAKS.length&&elapsed>=CHEER_PEAKS[action.beats]){
-        const beat=action.beats++;
-        options.onOwnCheerBeat?.(action.call,beat,action.call?.direction);
-      }
-      if(elapsed>=duration){
-        currentAction=null;localSignal=null;local.group.userData.atdGesture=null;
-        options.onCheerEnd?.();
-      }
-    }else if(action.mode==='smoke'){
-      if(elapsed>=SMOKE_DURATION){currentAction=null;localSignal=null;}
-    }else if(action.mode==='eat'){
-      if(elapsed>=EAT_DURATION){currentAction=null;localSignal=null;}
-    }else if(['coffee','phone'].includes(action.mode)){
-      if(elapsed>2.8)currentAction=null;
-    }
+    return null;
   }
-  function updateFigures(dt){
-    const moving=walkMix>.035;
-    local.group.position.set(player.x,player.y,player.z);
+  async function goToWish(side) {
+    const entry=court.wishEntries?.[side];
+    if(!entry||!active||disposed||aligning||gestureLocked())return false;
+    if(distance(player,entry)>entry.radius){
+      const result=await autopilot(entry,null,false,true);
+      if(!result.arrived)return false;
+    }
+    return true;
+  }
+  function interactNearShrine() {
+    const entry=nextToShrine();if(!entry||gestureLocked()||blocked())return false;
+    shrineInteraction(entry.kind==='court'?'guardian':entry.kind,entry.id);return true;
+  }
+  async function shrineInteraction(kind,id) {
+    const spot=kind==='guardian'?court.spots.find(s=>s.id===id):court.wishEntries?.[id];
+    if(!spot||gestureLocked())return;
+    if(kind==='guardian'){
+      options.onShrineInteraction?.(kind,id);
+      return;
+    }
+    if(await goToWish(id))options.onShrineInteraction?.(kind,id);
+  }
+  // Use the first visible painted object; a stack, crane or another vessel in
+  // front of a ship must consume the ray instead of activating a hidden hull.
+  function tap(x,y) {
+    if(gestureLocked()||aligning)return;
+    const bounds=canvas.getBoundingClientRect();
+    pointer.set((x-bounds.left)/bounds.width*2-1,-(y-bounds.top)/bounds.height*2+1);
+    camera.updateMatrixWorld();scene.updateMatrixWorld(true);ray.setFromCamera(pointer,camera);
+    const hit=ray.intersectObjects(scene.children,true).find(h=>{
+      if(!h.object.isMesh||h.distance<=camera.near||h.object.material?.opacity<.22)return false;
+      for(let o=h.object;o;o=o.parent)if(!o.visible||o===local.group||o===local.shade||o.userData.backgroundOnly)return false;
+      return true;
+    });
+    if(hit){
+      for(let o=hit.object;o;o=o.parent){
+        if(o===set.mainShip){if(departureCall)approachContact('push',hit.point.z);else options.onDockContact?.('push',null);return;}
+        if(o===set.arrivalShip||o===ropeTubes){if(arrivalCall)approachContact('pull',arrival.z);else options.onDockContact?.('pull',null);return;}
+        const kind=o.userData.atdInteract;
+        if(kind==='departureOffice'){
+          if(!office.replay())options.onHint?.('최근 공식 출항 확인 기록을 기다리고 있어요.');
+          return;
+        }
+        if(kind==='board'){options.onTerminalBoard?.();return;}
+        if(kind==='wish'||kind==='guardian'){shrineInteraction(kind,kind==='wish'?o.userData.wishSide:o.userData.guardianId);return;}
+        if(kind==='eomuk'){visitFoodStall();return;}
+        if(kind==='sharkWatch'){goTo('shark',true);return;}
+        if(kind==='shark'){options.onHint?.('북항이가 부두 옆을 헤엄치고 있어요.');return;}
+        if(kind==='seat'){sitAt(o.userData.seatId);return;}
+        if(kind==='smoking'){
+          if(nearSmoking(player))options.onZone?.('smoking');else goTo('smoking',true);
+          return;
+        }
+      }
+    }
+    const point=ray.ray.intersectPlane(walkPlane,new V3());if(!point)return;
+    const box=set.worldBounds;
+    if(point.x<box.minX-2||point.x>box.maxX+2||point.z<box.minZ-2||point.z>box.maxZ+2)return;
+    const target=Object.entries(zones).find(([,z])=>distance(z,point)<1.25);
+    if(target)goTo(target[0],false);else autopilot(point,null,false,false);
+  }
+  const events=new AbortController(),on=(target,name,listener,opts={})=>target.addEventListener(name,listener,{...opts,signal:events.signal});
+  on(canvas,'pointerdown',e=>{
+    if(blocked() || (e.pointerType==='mouse' && e.button!==0 && e.button!==2))return;
+    canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pointers.size===1){gesture={id:e.pointerId,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,drag:false};pinch=null;}
+    if(pointers.size===2){const [a,b]=pointers.values();pinch={distance:Math.hypot(b.x-a.x,b.y-a.y),zoom};if(gesture)gesture.drag=true;}
+  });
+  on(canvas,'pointermove',e=>{
+    if(!pointers.has(e.pointerId)||blocked())return;
+    pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pinch && pointers.size>=2){if(railView==='shark')railView=null;const [a,b]=pointers.values();zoom=clamp(pinch.zoom*Math.hypot(a.x-b.x,a.y-b.y)/Math.max(pinch.distance,1),.66,1.85);return;}
+    if(!gesture || gesture.id!==e.pointerId)return;
+    const d=Math.hypot(e.clientX-gesture.x,e.clientY-gesture.y);if(d>5)gesture.drag=true;
+    if(gesture.drag){cameraYaw-=(e.clientX-gesture.lastX)*.008;
+      const dy=e.clientY-gesture.lastY;
+      cameraPitch=clamp(cameraPitch+dy*.005,.10,.94);
+      if(['shrine','yard','shark','control'].includes(railView))railView=null;
+      gestureTime=time;canvas.style.cursor='grabbing';}
+    gesture.lastX=e.clientX;gesture.lastY=e.clientY;
+  });
+  function release(e) {
+    const g=gesture;pointers.delete(e.pointerId);
+    if(g && g.id===e.pointerId && !g.drag && !blocked() && e.type==='pointerup')tap(e.clientX,e.clientY);
+    if(pointers.size<2)pinch=null;
+    gesture=null;canvas.style.cursor='grab';
+  }
+  on(canvas,'pointerup',release);on(canvas,'pointercancel',release);on(canvas,'contextmenu',e=>e.preventDefault());
+  on(canvas,'wheel',e=>{if(blocked())return;e.preventDefault();zoomBy(clamp(-e.deltaY*.002,-.22,.22));},{passive:false});
+  const joystick=element('div','position:absolute;left:14px;bottom:calc(var(--chat-footprint,0px) + max(12px,env(safe-area-inset-bottom)));width:77px;height:77px;display:none;align-items:center;justify-content:center;border-radius:50%;border:1px solid #fff8;background:#173c4a45;touch-action:none;user-select:none;box-shadow:inset 0 0 0 6px #ffffff18;z-index:2;','캐릭터 이동 조이스틱');
+  const knob=element('div','width:33px;height:33px;border-radius:50%;border:2px solid #ffffffb0;background:#f9f5e9b3;pointer-events:none;');
+  joystick.append(knob);host.append(joystick);
+  const touchDevice=window.matchMedia('(pointer:coarse)').matches || navigator.maxTouchPoints>0;
+  let stickId=null;
+  const resetStick=()=>{joy.x=joy.y=0;stickId=null;knob.style.transform='translate(0,0)';};
+  function positionStick(e) {const r=joystick.getBoundingClientRect();let x=e.clientX-r.x-r.width/2,y=e.clientY-r.y-r.height/2;const d=Math.hypot(x,y),max=24;const s=d>max?max/d:1;x*=s;y*=s;joy.x=x/max;joy.y=-y/max;knob.style.transform='translate('+x+'px,'+y+'px)';}
+  on(joystick,'pointerdown',e=>{if(blocked())return;stickId=e.pointerId;joystick.setPointerCapture(stickId);e.preventDefault();positionStick(e);});
+  on(joystick,'pointermove',e=>{if(e.pointerId===stickId)positionStick(e);});
+  on(joystick,'pointerup',resetStick);on(joystick,'pointercancel',resetStick);
+  on(window,'keydown',e=>{
+    const key=e.key.toLowerCase();
+    if(e.defaultPrevented || e.isComposing || e.ctrlKey || e.metaKey || e.altKey || blocked() || (e.target.closest?.('input,textarea,select,button,[contenteditable="true"]') && e.target!==canvas))return;
+    if(['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d'].includes(key)){keys.add(key);e.preventDefault();}
+    if((key==='e'||key==='enter')&&!e.repeat&&!gestureLocked()){
+      if(interactNearShrine()){e.preventDefault();}
+      else if(near&&!['yard','departure','arrival'].includes(near)){e.preventDefault();options.onZone?.(near);}
+    }
+  });
+  on(window,'keyup',e=>keys.delete(e.key.toLowerCase()));
+  on(window,'blur',()=>{keys.clear();resetStick();});
+  on(document,'visibilitychange',()=>{if(document.hidden){keys.clear();resetStick();}});
+  function setActive(next) {
+    active=Boolean(next);joystick.style.display=active&&touchDevice?'flex':'none';
+    labels.hidden=!active;
+    if(!active){
+      if(currentAction?.mode==='smoke'||currentAction?.mode==='eat'){currentAction=null;paintBreath(local,-1);}
+      contactIntent++;keys.clear();resetStick();cancelPlan();pointers.clear();gesture=null;pinch=null;
+    }
+    if(active){refreshNearby(true);resize();}
+  }
+  function motion(dt) {
+    const x=joy.x+Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'));
+    const z=joy.y+Number(keys.has('w')||keys.has('arrowup'))-Number(keys.has('s')||keys.has('arrowdown'));
+    let moved=0;
+    if(Math.hypot(x,z)<.12||Math.abs(player.z-departure.z)>2.75||player.x<departure.anchor.x-1.3)touchLatched=false;
+    if(gestureLocked()){walkMix=ease(walkMix,0,dt*14);refreshNearby();return;}
+    if(Math.hypot(x,z)>.12 && !blocked()) {
+      if(seated)standUp();
+      cancelPlan();currentAction=null;railView=null;
+      dirVector.set(x*Math.cos(cameraYaw)-z*Math.sin(cameraYaw),0,-x*Math.sin(cameraYaw)-z*Math.cos(cameraYaw));
+      if(dirVector.length()>1)dirVector.normalize();
+      heading=turn(heading,Math.atan2(dirVector.x,dirVector.z),dt);
+      moved=moveWithCollision(dirVector.x*dt*WALK_SPEED,dirVector.z*dt*WALK_SPEED);
+      if(callFor('push')&&dirVector.x>.42&&player.x>=departure.anchor.x-.79&&Math.abs(player.z-departure.z)<=2.45){
+        player.x=departure.anchor.x-.778;
+        if(!touchLatched){touchLatched=true;options.onDockContact?.('push',departureCall.id);}
+      }
+    }else if(plan && !blocked()){
+      const speed=plan.quick?clamp(distance(player,plan.target)*.25+WALK_SPEED,WALK_SPEED,TRAVEL_SPEED):WALK_SPEED;
+      moved=walk(dt*speed,dt);
+    }
+    if(moved>.001){lastMove=time;walkPhase+=Math.min(moved*GAIT_PER_UNIT,14*dt);}
+    walkMix=ease(walkMix,moved>.001?1:0,dt*11);
+    refreshNearby();
+  }
+  function pullPulse(age) {
+    if(age<0 || age>1.05)return 0;
+    return Math.pow(Math.max(0,Math.sin(Math.PI*age/1.05)),.75);
+  }
+  function playerPose(dt) {
+    const action=currentAction,age=action?.mode==='cheer'?cheerAge(action):action?time-action.start:10;
+    const slap=action?.mode==='push'?slapPoseAtFrame(action,age):{push:0,backswing:0,recoil:0};
+    const smokeAge=action?.mode==='smoke'?(performance.now()-action.smokeAt)/1000:-1;
+    const smoking=smokeAge>=0&&smokeAge<SMOKE_DURATION&&nearSmoking(player);
+    if(action?.mode==='smoke'&&!smoking)currentAction=null;
+    const eating=action?.mode==='eat'&&nearEomuk(player)&&age<EAT_DURATION;
+    if(action?.mode==='eat'&&!eating)currentAction=null;
+    let pull=action?.mode==='pull'?pullPulse(age):0,coffee=0,phone=0;
+    if(action?.mode==='coffee'||action?.mode==='phone') {
+      const t=Math.min(1,age/2.25);const strength=Math.sin(Math.PI*t);
+      if(action.mode==='coffee')coffee=strength;else phone=strength;
+      if(t>=1)currentAction=null;
+    } else if(!action && time-lastMove>3.2 && walkMix<.1) {
+      const phase=(time+1.7)%22;
+      coffee=phase>4&&phase<6.6?Math.sin((phase-4)/2.6*Math.PI):0;
+      phone=phase>14&&phase<17?Math.sin((phase-14)/3*Math.PI):0;
+    }
+    seatBlend=ease(seatBlend,seated?1:0,dt*(seated?8:12));
+    local.group.position.copy(player);
+    if(lastSeat&&seatBlend>.005){
+      const a=lastSeat.approach;
+      if(seated){
+        local.group.position.x=mix(a.x,player.x,seatBlend);local.group.position.z=mix(a.z,player.z,seatBlend);
+      }else{
+        local.group.position.x=mix(player.x,seatX(lastSeat),seatBlend);local.group.position.z=mix(player.z,seatZ(lastSeat),seatBlend);
+      }
+    }
     local.group.rotation.y=heading;
-    const bob=moving&&!seated?Math.sin(walkPhase*2)*.045:0;
-    local.group.position.y=player.y+bob+(seated?-.22:0);
-    if(local.shade){updateShadow(local);local.shade.visible=!seated;}
-    local.group.userData.atdWalk=walkMix;
-    local.group.userData.atdPhase=walkPhase;
-    if(currentAction?.mode==='smoke')paintBreath(local,(performance.now()-currentAction.smokeAt)/1000);
-    else if(currentAction?.mode==='eat')paintBreath(local,-1);
-    else if(local.vapor)local.vapor.visible=false;
-
-    for(const p of peers.values()){
-      const elapsed=Math.min(.35,Math.max(0,(performance.now()-(p.received||performance.now()))/1000));
-      const tx=p.tx+p.vx*elapsed*.22,tz=p.tz+p.vz*elapsed*.22;
-      const g=p.fig.group;
-      g.position.x=mix(g.position.x,tx,1-Math.exp(-dt*9));
-      g.position.z=mix(g.position.z,tz,1-Math.exp(-dt*9));
-      g.position.y=measuredGround(g.position.x,g.position.z);
-      g.rotation.y=turn(g.rotation.y,p.yaw,dt);
-      if(p.fig.shade)updateShadow(p.fig);
-      if(smokeMotion(p.motion)&&p.smokeAt!==undefined)paintBreath(p.fig,(performance.now()-p.smokeAt)/1000);
-      else if(p.fig.vapor)p.fig.vapor.visible=false;
+    const praying=action?.mode==='cheer';
+    local.animate({time,walk:praying||seated?0:walkMix,walkPhase,sit:seatBlend,seatHeight:lastSeat?lastSeat.y-player.y:undefined,...slap,...(praying?cheerPose(age):{}),pull,coffee,phone,...smokingPose(smoking?smokeAge:-1),eat:eating?bitePose(age):0});updateShadow(local);
+    paintBreath(local,smoking?smokeAge:-1);
+    if(praying){
+      while(action.beats<CHEER_PEAKS.length && age>=CHEER_PEAKS[action.beats]){
+        cheers.exclaim(selfSpeaker,localAnchor,action.call,++action.beats,performance.now()/1000);
+        options.onOwnCheerBeat?.(action.call,action.beats,action.call.direction);
+      }
+      if(age>=CHEER_DURATION){currentAction=null;options.onCheerEnd?.({requestId:action.requestId,callId:action.call.id});}
     }
+    if(action && ['push','pull'].includes(action.mode)) {
+      dispatchContacts(local,action,action.mode,age,true,true);
+      if(age>=(action.mode==='push'?PALM_DURATION:1.05)){
+        currentAction=null;options.onDockGestureEnd?.(action.mode);
+      }
+    }
+    const now=Date.now();
+    for(const [id,p] of peers){
+      if(now-p.seen>22000){removePeer(id,p);continue;}
+      if(p.actionMode){
+        const complete=p.actionMode==='cheer'?cheerAge(p)>=CHEER_DURATION&&p.beats===CHEER_PEAKS.length:
+          time-p.started>=(p.actionMode==='push'?PALM_DURATION:1.05);
+        if(complete)p.actionMode=null;
+      }
+      while(!p.actionMode && p.queue.length){
+        const event=p.queue.shift(),dock=event.mode==='push'?departure:arrival;
+        if(now-event.accepted>8000)continue;
+        if(event.mode==='cheer'){if(!atCourt({x:p.tx,z:p.tz}))continue;}
+        else if(Math.abs(p.tx-dock.x)>1.7||Math.abs(p.tz-dock.z)>3.4)continue;
+        if(event.mode==='cheer'){
+          p.cheerAt=performance.now();
+          cheers.exclaim(id,()=>peers.get(id)?.fig.group,event,0,p.cheerAt/1000);
+        }
+        p.actionMode=event.mode;p.event=event;p.started=time;p.beats=0;
+      }
+      const pos=p.fig.group.position,age=p.actionMode==='cheer'?cheerAge(p):time-p.started;
+      const pose=p.actionMode==='push'?slapPoseAtFrame(p,age):{push:0,backswing:0,recoil:0};
+      const move=p.motion==='walk' && now-p.seen<2200;
+      const lead=move?Math.min(Math.max(0,(now-p.received)/1000),.16):0;
+      let x=p.tx+p.vx*lead,z=p.tz+p.vz*lead;
+      if(!p.seat&&!canWalk(x,z)){x=p.tx;z=p.tz;}
+      const drift=Math.hypot(x-pos.x,z-pos.z);
+      const previousX=pos.x,previousZ=pos.z;
+      pos.x=ease(pos.x,x,dt*6.5);pos.z=ease(pos.z,z,dt*6.5);pos.y=measuredGround(pos.x,pos.z);
+      p.walkPhase=(p.walkPhase||0)+Math.min(Math.hypot(pos.x-previousX,pos.z-previousZ)*GAIT_PER_UNIT,14*dt);
+      const remoteYaw=p.actionMode==='cheer'||!p.actionMode?p.yaw:(p.actionMode==='push'?departure:arrival).yaw;
+      p.fig.group.rotation.y=turn(p.fig.group.rotation.y,remoteYaw,dt);
+      p.walk=ease(p.walk,(move||drift>.13)?1:0,dt*9);
+      labelPoint.set(pos.x,pos.y+1.15,pos.z).project(camera);
+      p.fig.group.visible=distance(player,pos)<60 && labelPoint.z>-.98 && labelPoint.z<1.005 && Math.abs(labelPoint.x)<1.32 && Math.abs(labelPoint.y)<1.4;
+      p.fig.shade.visible=p.fig.group.visible;
+      p.sitBlend=ease(p.sitBlend||0,p.seat?1:0,dt*8);
+      const smokeAge=smokeMotion(p.motion)&&!p.actionMode&&nearSmoking({x:p.tx,z:p.tz})?(performance.now()-p.smokeAt)/1000:-1;
+      if(p.fig.group.visible){
+        const prop=(p.motion==='coffee'||p.motion==='phone')?.72:0;
+        const praising=p.actionMode==='cheer';
+        p.fig.animate({time:time+p.phase,walk:p.actionMode||p.seat?0:p.walk,walkPhase:p.walkPhase,sit:p.sitBlend,seatHeight:p.seat?p.seat.y-pos.y:undefined,...pose,...(praising?cheerPose(age):{}),pull:p.actionMode==='pull'?pullPulse(age):0,coffee:p.motion==='coffee'?prop:0,phone:p.motion==='phone'?prop:0,...smokingPose(smokeAge),eat:p.motion==='eat'&&!p.actionMode?bitePose(time-p.eatAt):0});updateShadow(p.fig);
+        if(praising){
+          while(p.beats<CHEER_PEAKS.length&&age>=CHEER_PEAKS[p.beats])cheers.exclaim(id,()=>peers.get(id)?.fig.group,p.event,++p.beats,performance.now()/1000);
+        }else if(p.actionMode)dispatchContacts(p.fig,p,p.actionMode,age,false,true);
+      } else if(p.actionMode){
+        const contacts=p.actionMode==='cheer'?CHEER_PEAKS:p.actionMode==='push'?PALM_CONTACTS:[.43];
+        while(p.beats<contacts.length && age>=contacts[p.beats])p.beats++;
+      }
+      paintBreath(p.fig,smokeAge);
+    }
+    for(const [i,f] of guardianFigures.entries())f.animate({time:time+i*.63,walk:0,push:0,pull:0,coffee:0,phone:0});
+    updateRope(Math.max(pull,shipPull));
+    shipPull=Math.max(0,shipPull-dt*1.6);shipPush=Math.max(0,shipPush-dt*2.2);
   }
-  function tick(stamp){
-    if(disposed)return;
-    frameHandle=requestAnimationFrame(tick);
-    const dt=lastFrame?clamp((stamp-lastFrame)/1000,0,.05):1/60;
-    lastFrame=stamp;time+=dt;frameCount++;
-    if(active){
-      let dx=0,dz=0;
-      const forward=(keys.has('w')||keys.has('arrowup')?1:0)-(keys.has('s')||keys.has('arrowdown')?1:0);
-      const side=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0);
-      if((forward||side)&&!gestureLocked()&&!aligning&&!seated){
-        cancelPlan();openingVista=false;railView=null;
-        const fx=-Math.sin(cameraYaw),fz=-Math.cos(cameraYaw),rx=Math.cos(cameraYaw),rz=-Math.sin(cameraYaw);
-        dx=fx*forward+rx*side;dz=fz*forward+rz*side;
-        const len=Math.hypot(dx,dz)||1;dx/=len;dz/=len;
-        const speed=currentAction?.mode==='push'||currentAction?.mode==='pull'?1.15:WALK_SPEED;
-        const moved=moveWithCollision(dx*speed*dt,dz*speed*dt);
-        if(moved>.001){heading=turn(heading,Math.atan2(dx,dz),dt);lastMove=time;walkPhase+=moved*GAIT_PER_UNIT;}
-      }
-      let movedAuto=0;
-      if(plan&&!gestureLocked()&&!seated){
-        const speed=plan.quick?TRAVEL_SPEED:WALK_SPEED;
-        movedAuto=walk(speed*dt,dt);
-        if(movedAuto>.001){lastMove=time;walkPhase+=movedAuto*GAIT_PER_UNIT;}
-      }
-      const moving=dx!==0||dz!==0||movedAuto>.001;
-      walkMix=ease(walkMix,moving?1:0,dt*9);
-      if(moving){openingVista=false;if(railView==='shark')railView=null;}
-      if(seated&&lastSeat){player.set(seatX(lastSeat),measuredGround(lastSeat.x,lastSeat.z),seatZ(lastSeat));}
-      updateAction(dt);
-      if(currentAction?.mode==='cheer'){
-        const elapsed=time-currentAction.start;
-        const pose=cheerPose(elapsed);
-        guardianFigures.forEach(fig=>{fig.group.userData.atdCheer=pose;});
-      }
-      ambient(dt);
-      harborLife.update?.(time);
-      office.update?.(time);
-      marquee.update?.(time);
-      if(time-markerTimer>2.1)groundMarker.visible=false;
-      if(time-ceremony>4.8)feedback.hidden=true;
-      updateRope(currentAction?.mode==='pull'?1:currentAction?.mode==='push'?shipPush:0);
-      updateFigures(dt);
-      refreshNearby();
-      adjustView(dt);
-      placeLabels();
-      paintMarks();
-      cheers.update?.(stamp/1000);
-      court.update?.(time);
-      set.update?.(time);
-      if(frameCount%3===0)options.onFrame?.({time,player:{x:player.x,z:player.z},nearby:near});
+  function animation(dt) {
+    const age=time-actionWave;
+    if(littleRing.visible){littleRing.material.opacity=clamp(1-age/.55,0,1);littleRing.scale.setScalar(.3+Math.max(0,age)*2);if(age>.55)littleRing.visible=false;}
+    if(wave.visible){wave.position.y=-.6+.3*Math.sin(Math.min(age/1.3,1)*Math.PI);wave.scale.setScalar(Math.max(.01,Math.sin(Math.min(age/1.3,1)*Math.PI)));if(age>=1.3)wave.visible=false;}
+    for(let i=effects.length-1;i>=0;i--){const p=effects[i],t=time-p.start,f=t/p.duration;
+      if(f>=1){scene.remove(p.mesh);if(!p.velocity)p.mesh.material.dispose();effects.splice(i,1);continue;}
+      if(p.velocity){p.mesh.position.copy(p.base).addScaledVector(p.velocity,t);p.mesh.position.y-=t*t*1.8;p.mesh.scale.setScalar(1-f);}
+      else {p.mesh.position.copy(p.base);p.mesh.position.y+=f*.55;p.mesh.material.opacity=Math.min(1,(1-f)*3);const s=.68+.23*Math.sin(Math.PI*f);p.mesh.scale.set(s*p.aspect,s,1);}
     }
+    if(groundMarker.visible){const f=clamp((time-markerTimer)/1.15,0,1);groundMarker.scale.setScalar(1+f);groundMarker.material.opacity=.82*(1-f);if(f>=1)groundMarker.visible=false;}
+    const celebration=time-ceremony;
+    for(let i=confetti.length-1;i>=0;i--){const c=confetti[i];c.m.position.set(c.x+Math.sin(celebration+c.phase)*.8,c.y-celebration*c.fall,c.z+Math.cos(celebration+c.phase)*.4);c.m.rotation.set(celebration*.6,c.phase+celebration,celebration*.95);
+      if(c.m.position.y<0||celebration>9){scene.remove(c.m);c.m.geometry.dispose();c.m.material.dispose();confetti.splice(i,1);}
+    }
+    if(celebration>7)feedback.hidden=true;
+    set.update?.({time,night,push:shipPush,pull:shipPull,departure:0});
+    court.update(time,night,reduceMotion);
+    marquee.update(time);office.update(time,distance(player,office.approach)<8);harborLife.update(time,night,reduceMotion);
+  }
+  let frame=0,last=performance.now();
+  function tick(stamp) {
+    if(disposed)return;
+    frame=requestAnimationFrame(tick);
+    if(document.hidden || !active){last=stamp;return;}
+    const dt=Math.min(software?.14:.075,Math.max(.001,(stamp-last)/1000));last=stamp;time+=dt;
+    ambient(dt);motion(dt);playerPose(dt);animation(dt);adjustView(dt);
+    placeLabels();paintMarks();dome.position.copy(camera.position);stars.position.copy(camera.position);moon.position.set(camera.position.x+30,camera.position.y+31,camera.position.z-119);
     renderer.render(scene,camera);
+    if(software)marquee.paintView?.(camera,width,height);
   }
-  function setActive(value){
-    active=Boolean(value);
-    if(!active){cancelPlan();keys.clear();pointerDown=null;}
-    if(active)resize();
+  function dispose() {
+    if(disposed)return;disposed=true;cancelAnimationFrame(frame);cancelPlan();observer.disconnect();events.abort();
+    court.destroy();marquee.destroy();office.dispose();harborLife.dispose();
+    cheers.clear();
+    const geometries=new Set(),materials=new Set(),textures=new Set([smokeTex]);
+    scene.traverse(o=>{if(o.geometry)geometries.add(o.geometry);for(const m of Array.isArray(o.material)?o.material:o.material?[o.material]:[]){materials.add(m);for(const v of Object.values(m))if(v?.isTexture)textures.add(v);}});
+    scene.clear();for(const g of geometries)g.dispose();for(const m of materials)m.dispose();for(const t of textures)t.dispose();
+    pullLabel.texture.dispose();set.destroy?.();renderer.dispose();host.remove();
   }
-  function getZonePosition(id){
-    const z=zones[id];return z?{x:z.x,z:z.z,y:z.y||0}:null;
-  }
-  function setBoard(value){marquee.setBoard?.(value);set.setBoard?.(value);}
-  function setDepartures(value,terminal){office.setDepartures?.(value,terminal);set.setDepartures?.(value,terminal);}
-  let wishState={selected:null,wishes:[]};
-  function setWishes(selected,wishes=[]){wishState={selected,wishes:Array.isArray(wishes)?wishes:[]};set.setWishes?.(selected,wishState.wishes);}
-  function goToWish(id){
-    const index=wishState.wishes.findIndex(w=>w.id===id);
-    const wish=index>=0?wishState.wishes[index]:null;
-    const side=id==='right'?1:id==='left'?-1:(index%2?1:-1);
-    const target=wish&&Number.isFinite(Number(wish.x))&&Number.isFinite(Number(wish.z))
-      ?{x:Number(wish.x),z:Number(wish.z)}
-      :{x:zones.shrine.x+side*1.8,z:zones.shrine.z+1.4};
-    return autopilot(target,null,false,true,true);
-  }
-  function interactNearShrine(){return false;}
-  function replayDeparture(){return office.replay?.()||false;}
-  function setProfile(value){
-    profile=value||{};const next=profile.style==='vest'?'vest':'cardigan';
-    if(next===style)return;
-    removeFigure(local);style=next;local=addFigure(style);local.group.position.copy(player);local.group.rotation.y=heading;updateShadow(local);
-  }
-  function dispose(){
-    if(disposed)return;
-    disposed=true;cancelAnimationFrame(frameHandle);cancelPlan();observer.disconnect();
-    canvas.removeEventListener('pointerdown',pointerStart);
-    canvas.removeEventListener('pointermove',pointerMove);
-    canvas.removeEventListener('pointerup',pointerEnd);
-    canvas.removeEventListener('pointercancel',pointerEnd);
-    canvas.removeEventListener('wheel',wheel);
-    canvas.removeEventListener('contextmenu',context);
-    canvas.removeEventListener('keydown',keyDown);canvas.removeEventListener('keyup',keyUp);
-    window.removeEventListener('keydown',keyDown);window.removeEventListener('keyup',keyUp);window.removeEventListener('blur',blur);
-    for(const [id,p] of peers)removePeer(id,p);
-    removeFigure(local);for(const fig of guardianFigures)removeFigure(fig);
-    for(const mark of palmMarks)mark.wrapper.remove();
-    for(const effect of effects){scene.remove(effect.mesh);effect.mesh.material?.dispose();}
-    cheers.dispose?.();office.dispose?.();marquee.destroy?.();harborLife.destroy?.();set.dispose?.();
-    smokeTex.dispose();shadeTex.dispose();shadeGeo.dispose();shadeMat.dispose();splashGeo.dispose();splashMat.dispose();
-    ringGeo.dispose();littleRing.material.dispose();waveMat.dispose();faceMat.dispose();ropeGeometry.dispose();rope.material.dispose();
-    ropeUnitGeo.dispose();ropeMat.dispose();pullLabel.texture.dispose();
-    for(const p of confetti){scene.remove(p.m);p.m.geometry.dispose();p.m.material.dispose();}
-    renderer.dispose?.();host.remove();container.replaceChildren();
-  }
-  refreshNearby(true);
-  adjustView(1/60);
-  frameHandle=requestAnimationFrame(tick);
-  return {
-    available:true,
-    sayChat,
-    setActive,
-    goTo,
-    watchShark,
-    eatFishcake,
-    replayDeparture,
-    smoke,
-    interactNearShrine,
-    toggleSeat,
-    getPresence,
-    setBoard,
-    setDepartures,
-    setWishes,
-    setProfile,
-    setWeather,
-    setLight,
-    bindVessels,
-    setVessel,
-    setNeighbors,
-    celebrate,
-    canCheerHere,
-    approachGuardian,
-    cheer,
-    goToWish,
-    setLivePeers,
-    getZonePosition,
-    actAtDock,
-    visitFoodStall,
-    goToPeer,
-    getSeatState,
-    dispose
-  };
+  on(canvas,'webglcontextlost',e=>{e.preventDefault();if(!disposed)options.onHint?.('3D 화면 연결을 복구하고 있어요.');});
+  joystick.style.display=active&&touchDevice?'flex':'none';local.group.position.copy(player);local.group.rotation.y=heading;
+  bindVessels();updateShadow(local);adjustView(1);frame=requestAnimationFrame(tick);
+  return {available:true,renderer:software?'canvas3d':'webgl',getZonePosition:id=>zones[id],getNearbyShrine:()=>nearbyShrine,watchShark,getPresence,setLivePeers,goToPeer,goTo,goToWish,actAtDock,act,smoke,eatFishcake,toggleSeat,sitAt,standUp,getSeatState,cheer,sayChat,canCheerHere,approachGuardian,interactNearShrine,home,zoomBy,setActive,setProfile,setPeers,setNeighbors,setVessel,bindVessels,setBoard:state=>marquee.setBoard(state),setDepartures:(calls,terminal)=>office.setDepartures(calls,terminal),replayDeparture:()=>office.replay(),setWishes:(call,wishes)=>court.setWishes(call,wishes),setWeather,setLight,celebrate,dispose,destroy:dispose};
 }
