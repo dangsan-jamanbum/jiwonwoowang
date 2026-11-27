@@ -277,7 +277,7 @@ function addEomuk(k,holder){
 }
 
 function buildRig(T,style,guardian){
-  const k=kit(T),{group,orb,rings,tube,plaque,rect,lock}=k;
+  const k=kit(T),{group,orb,rings,tube,plaque,rect,lock,mesh}=k;
   const h=style==='honghong', f=style==='cardigan'||h, g=guardian||'';
   const themes={
     poseidon:{hair:'#365e75',hairLight:'#608697',brow:'#38556a',skin:'#deb18e',coat:'#749ca2'},
