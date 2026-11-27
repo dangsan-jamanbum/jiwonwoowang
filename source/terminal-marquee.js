@@ -33,7 +33,7 @@ export function boardData(state={}){
     (c.berthPhase!=='departed'||c.loading?.workCheckedAt))
     .sort((a,b)=>priority(a)-priority(b)||String(a.etb||'~').localeCompare(String(b.etb||'~')));
   return {terminal,source:source.label||'',last:timeLabel(source.checkedAt||source.updatedAt),statusText,live,
-    rows,trucks:status.yardTrucks||null};
+    rows,trucks:status.yardTrucks||null,delayDays:Number(status.delayDays)||0,delayEvents:Array.isArray(status.delayEvents)?status.delayEvents:[]};
 }
 export function mountTerminalMarquee(T,scene,renderer){
   const group=new T.Group();group.name='항만 운영 전광판';scene.add(group);
@@ -87,6 +87,8 @@ export function mountTerminalMarquee(T,scene,renderer){
     ctx.fillStyle='#102934';ctx.fillRect(0,0,W,H);ctx.fillStyle='#173541';ctx.fillRect(0,0,W,110);
     ctx.fillStyle='#ffa83e';ctx.fillRect(0,0,10,110);
     words(board.terminal.toUpperCase()+'   선적 현황',46,78,59,'#fff8e8',750,775);
+    const delay=Number(board.delayDays)||0,delayColor=delay>0?'#ff9b84':delay<0?'#a2e4bd':'#bed1cf';
+    words('출항 지연 '+(delay>0?'+':'')+delay+'일',46,104,22,delayColor,750,330);
     ctx.textAlign='right';words(board.statusText,W-42,48,31,board.live?'#a2e4bd':'#ffc17e',700);
     words('BUSAN NEW PORT',W-42,87,24,'#accaCE',600);ctx.textAlign='left';
     const X=[46,601,792,987,1200], label='#9fbfc6';
@@ -115,13 +117,13 @@ export function mountTerminalMarquee(T,scene,renderer){
     ctx.fillStyle='#274650';ctx.fillRect(20,455,W-40,2);
     const trucks=board.trucks;
     const truckLabel=trucks && Number.isFinite(trucks.inbound)&&Number.isFinite(trucks.outbound)?'  ·  반입 '+trucks.inbound+'대 / 반출 '+trucks.outbound+'대':'';
-    words((board.source?board.terminal.toUpperCase()+' 운영사 공개자료':'부산항')+truckLabel,46,507,26,'#bed1cf',520,805);
+    const recent=board.delayEvents?.[0],recentLabel=recent?'  ·  최근 '+recent.itemName+' '+(recent.deltaDays>0?'+':'')+recent.deltaDays+'일':'';\n    words((board.source?board.terminal.toUpperCase()+' 운영사 공개자료':'부산항')+truckLabel+recentLabel,46,507,24,'#bed1cf',520,805);
     ctx.textAlign='right';words((board.last==='—'?'':'확인 '+board.last+' KST   ')+(board.rows.length>3?(page+1)+'/'+Math.ceil(board.rows.length/3):''),W-43,507,25,'#b6c9c8',550,540);ctx.textAlign='left';
     tex.needsUpdate=true;
   }
   function setBoard(state){
     const next=boardData(state);
-    const key=JSON.stringify([next.terminal,next.statusText,next.source,next.last,next.trucks,next.rows.map(r=>[r.id,r.name,r.voy,r.berth,r.berthPhase,r.etb,r.etd,r.loading])]);
+    const key=JSON.stringify([next.terminal,next.statusText,next.source,next.last,next.trucks,next.delayDays,next.delayEvents,next.rows.map(r=>[r.id,r.name,r.voy,r.berth,r.berthPhase,r.etb,r.etd,r.loading])]);
     if(signature===key)return;
     const reset=next.terminal!==board?.terminal;board=next;signature=key;
     page=reset?0:Math.max(0,Math.min(page,Math.ceil(board.rows.length/3)-1));paint();
