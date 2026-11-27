@@ -1013,8 +1013,24 @@ export function mountWalk3D(container, options={}) {
     if(!active||disposed||distance(player,zones.shark)>zones.shark.radius)return false;
     if(railView!=='shark')frameSharkFromHere();
     const result=harborLife.fishShark?.()||'busy';
-    options.onHint?.(result==='started'?'낚싯대를 던졌어요! 잠시 기다리면 상어가 물고 회 접시가 가득 차요.':
-      result==='full'?'상어회 접시가 이미 가득 찼어요.':'낚싯줄을 당기는 중이에요!');
+    if(result==='ready'){
+      if(harborLife.pickUpShark?.(local.group))options.onHint?.('상어를 품에 안았어요! 포장마차로 가져가 E키를 눌러 건네주세요.');
+      else options.onHint?.('상어를 낚았어요!');
+    }else if(result==='cast')options.onHint?.('미끼를 던졌어요. 상어가 물 때까지 잠깐 기다려요.');
+    else if(result==='waiting')options.onHint?.('미끼를 물 때까지 기다려요. 물면 E키를 빠르게 연타!');
+    else if(result==='reeling')options.onHint?.('좋아! 낚싯줄을 당기는 중이에요. 계속 E키 연타!');
+    else if(result==='caught')options.onHint?.('상어를 낚았어요! 눈이 X가 됐어요. E키를 한 번 더 눌러 들어 올리세요.');
+    else if(result==='carrying')options.onHint?.('상어를 들고 있어요. 포장마차로 가서 E키를 눌러 건네주세요.');
+    else if(result==='cooked')options.onHint?.('상어회가 완성됐어요! 포장마차에서 E키를 눌러 먹어보세요.');
+    else if(result==='eaten')options.onHint?.('바다를 다시 바라보세요. 아기 상어가 엄마를 찾고 있어요.');
+    return true;
+  }
+  function interactSharkAtStall(){
+    if(!active||disposed||distance(player,zones.eomuk)>zones.eomuk.radius)return false;
+    const result=harborLife.interactSharkAtStall?.();
+    if(result==='delivered')options.onHint?.('상어를 포장마차에 건넸어요. 요리하는 중이에요!');
+    else if(result==='eaten')options.onHint?.('상어회를 먹었어요… 바다 쪽에서 아기 상어 울음소리가 들려요.');
+    else return false;
     return true;
   }
   function placeLabels() {
@@ -1278,7 +1294,7 @@ export function mountWalk3D(container, options={}) {
     const key=e.key.toLowerCase();
     if(e.defaultPrevented || e.isComposing || e.ctrlKey || e.metaKey || e.altKey || blocked() || (e.target.closest?.('input,textarea,select,button,[contenteditable="true"]') && e.target!==canvas))return;
     if(['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d','shift'].includes(key)){keys.add(key);e.preventDefault();}
-    if((key==='e'||key==='enter')&&!e.repeat&&!gestureLocked()){
+    if((key==='e'||key==='enter')&&(!e.repeat||near==='shark')&&!gestureLocked()){
       if(carriedCargoId||nearestCargo()){e.preventDefault();e.stopImmediatePropagation();interactCargo();return;}
       if(near==='shark'){e.preventDefault();e.stopImmediatePropagation();watchShark();return;}
       if(interactNearShrine()){e.preventDefault();}
@@ -1444,7 +1460,7 @@ export function mountWalk3D(container, options={}) {
     if(celebration>7)feedback.hidden=true;
     set.update?.({time,night,push:shipPush,pull:shipPull,departure:0});
     court.update(time,night,reduceMotion);
-    marquee.update(time);office.update(time,distance(player,office.approach)<8);if(harborLife.update(time,night,reduceMotion)){options.onFishCaught?.();options.onHint?.('상어 낚시 성공! 포장마차의 회 접시가 상어회로 가득 찼어요.');}portVehicles.update(Date.now()/1000);
+    marquee.update(time);office.update(time,distance(player,office.approach)<8);const fishEvent=harborLife.update(time,night,reduceMotion);if(fishEvent==='cooked'){options.onFishCooked?.();options.onHint?.('상어회가 완성됐어요! 포장마차에서 먹을 수 있어요.');}portVehicles.update(Date.now()/1000);
   }
   let frame=0,last=performance.now();
   function tick(stamp) {
@@ -1469,5 +1485,5 @@ export function mountWalk3D(container, options={}) {
   on(canvas,'webglcontextlost',e=>{e.preventDefault();if(!disposed)options.onHint?.('3D 화면 연결을 복구하고 있어요.');});
   joystick.style.display=active&&touchDevice?'flex':'none';local.group.position.copy(player);local.group.rotation.y=heading;
   bindVessels();updateShadow(local);adjustView(1);frame=requestAnimationFrame(tick);
-  return {available:true,renderer:software?'canvas3d':'webgl',getZonePosition:id=>zones[id],getNearbyShrine:()=>nearbyShrine,watchShark,getPresence,setLivePeers,goToPeer,goTo,goToWish,actAtDock,act,smoke,eatFishcake,toggleSeat,sitAt,standUp,getSeatState,cheer,sayChat,canCheerHere,approachGuardian,interactNearShrine,hasCargoInteraction:()=>Boolean(carriedCargoId||nearestCargo()),interactCargo,home,zoomBy,setActive,setProfile,setPeers,setNeighbors,setVessel,bindVessels,setBoard:state=>marquee.setBoard(state),setDepartures:(calls,terminal)=>office.setDepartures(calls,terminal),replayDeparture:()=>office.replay(),setWishes:(call,wishes)=>court.setWishes(call,wishes),setWeather,setLight,celebrate,setCargo,setSashimiPlate:harborLife.setSashimiPlate,dispose,destroy:dispose};
+  return {available:true,renderer:software?'canvas3d':'webgl',getZonePosition:id=>zones[id],getNearbyShrine:()=>nearbyShrine,watchShark,interactSharkAtStall,getPresence,setLivePeers,goToPeer,goTo,goToWish,actAtDock,act,smoke,eatFishcake,toggleSeat,sitAt,standUp,getSeatState,cheer,sayChat,canCheerHere,approachGuardian,interactNearShrine,hasCargoInteraction:()=>Boolean(carriedCargoId||nearestCargo()),interactCargo,home,zoomBy,setActive,setProfile,setPeers,setNeighbors,setVessel,bindVessels,setBoard:state=>marquee.setBoard(state),setDepartures:(calls,terminal)=>office.setDepartures(calls,terminal),replayDeparture:()=>office.replay(),setWishes:(call,wishes)=>court.setWishes(call,wishes),setWeather,setLight,celebrate,setCargo,setSashimiPlate:harborLife.setSashimiPlate,dispose,destroy:dispose};
 }
