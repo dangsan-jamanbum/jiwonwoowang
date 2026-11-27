@@ -1022,14 +1022,14 @@ export function mountWalk3D(container, options={}) {
     else if(result==='caught')options.onHint?.('상어를 낚았어요! 눈이 X가 됐어요. E키를 한 번 더 눌러 들어 올리세요.');
     else if(result==='carrying')options.onHint?.('상어를 들고 있어요. 포장마차로 가서 E키를 눌러 건네주세요.');
     else if(result==='cooked')options.onHint?.('상어회가 완성됐어요! 포장마차에서 E키를 눌러 먹어보세요.');
-    else if(result==='eaten')options.onHint?.('바다를 다시 바라보세요. 아기 상어가 엄마를 찾고 있어요.');
+    else if(result==='eaten'){options.onFishEaten?.();options.onHint?.('바다를 다시 바라보세요. 아기 상어가 엄마를 찾고 있어요.');}
     return true;
   }
   function interactSharkAtStall(){
     if(!active||disposed||distance(player,zones.eomuk)>zones.eomuk.radius)return false;
     const result=harborLife.interactSharkAtStall?.();
     if(result==='delivered')options.onHint?.('상어를 포장마차에 건넸어요. 요리하는 중이에요!');
-    else if(result==='eaten')options.onHint?.('상어회를 먹었어요… 바다 쪽에서 아기 상어 울음소리가 들려요.');
+    else if(result==='eaten'){options.onFishEaten?.();options.onHint?.('상어회를 먹었어요… 바다 쪽에서 아기 상어 울음소리가 들려요.');}
     else return false;
     return true;
   }
