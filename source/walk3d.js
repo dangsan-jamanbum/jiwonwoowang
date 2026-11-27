@@ -1,5 +1,5 @@
 import * as THREE from './vendor/three.module.js';
-import { makeWorker, makeGuardian } from './harbor-figures.js?v=18';
+import { makeWorker, makeGuardian } from './harbor-figures.js?v=19';
 import { buildHarbor } from './harbor-set.js?v=22';
 import { CY_STACK_BOUNDS } from './cy-yard.js';
 import { buildGuardianCourt } from './guardian-court.js';
