@@ -79,3 +79,21 @@
 - `source/harbor-life.js`
 
 원본 웹사이트에서 이 파일들을 자동으로 내려받는 접근은 현재 차단되어 있어 아직 복구하지 못했습니다. 비슷한 코드로 대체하면 원본 3D 게임이 아니게 되므로 임의 대체하지 않습니다.
+
+
+## 2026-11-27 원본 파일 재확인
+
+- 저장소의 실제 import 구문을 다시 확인했습니다. `game.js.다운로드`는 위 게임 시작 모듈 9개를 직접 import하고, `source/walk3d.js`는 Three.js 및 12개의 3D 모듈을 import합니다.
+- 원본 사이트의 다음 주소에서 파일을 직접 열어 확보하려고 시도했지만, 현재 사용 가능한 웹 접근 경로에서 모두 접근 오류가 발생했습니다.
+  - `https://atd-harbor-club.blairsurvive.chatgpt.site/game.js?v=24`
+  - `https://atd-harbor-club.blairsurvive.chatgpt.site/walk3d.js?v=24`
+  - `https://atd-harbor-club.blairsurvive.chatgpt.site/harbor-set.js?v=22`
+- 공개 GitHub 코드 검색에서도 이 게임의 고유 모듈인 `harbor-set.js`, `harbor-figures.js`, `cy-yard.js`, `departure-office.js`의 원본을 확인하지 못했습니다.
+- 따라서 현재는 원본 3D 월드의 핵심 의존성이 해결되지 않았습니다. 새로 만든 대체 모듈을 넣거나 게임이 실행된다고 표시하지 않습니다.
+
+### 다음 복구 기준
+
+1. 원본 사이트의 정적 파일에 접근 가능한 경로를 확보합니다.
+2. 누락된 파일을 원래 디렉터리 구조와 import 버전 그대로 저장소에 복원합니다.
+3. 브라우저에서 실제 실행 및 콘솔 오류를 확인합니다.
+4. 그 다음에만 화물 운반과 운송 장비, 동기화 기능을 원본 구조에 맞춰 추가합니다.
