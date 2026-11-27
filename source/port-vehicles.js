@@ -50,7 +50,7 @@ export function buildPortVehicles(T,scene){
     g.scale.setScalar(1.22);return {group:g,suspended};
   }
   const forkliftRoutes=[
-    {x:-31,z:-42,rx:4.5,rz:2.5,speed:.23,phase:0},
+    {x:9,z:18,rx:2.8,rz:2.2,speed:.23,phase:0},
     {x:-7,z:-42,rx:4.5,rz:2.5,speed:.21,phase:1.4},
     {x:18,z:-42,rx:4.5,rz:2.5,speed:.22,phase:2.8},
     {x:-7.2,z:-72.5,rx:1.0,rz:5.5,speed:.18,phase:.6},
@@ -58,7 +58,7 @@ export function buildPortVehicles(T,scene){
     {x:10,z:-84.4,rx:8.0,rz:.8,speed:.16,phase:4.0}
   ];
   const carrierRoutes=[
-    {x:-31,z:-54.5,rx:4,rz:.8,speed:.14,phase:1.0},
+    {x:-9,z:15,rx:2.7,rz:.85,speed:.14,phase:1.0},
     {x:-7,z:-54.5,rx:4,rz:.8,speed:.15,phase:2.5},
     {x:18,z:-54.5,rx:4,rz:.8,speed:.14,phase:4.0},
     {x:-7.2,z:-94,rx:.8,rz:6,speed:.12,phase:.2},
