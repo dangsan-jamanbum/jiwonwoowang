@@ -168,7 +168,6 @@ const server=http.createServer(async(req,res)=>{
       return json(res,200,{terminal,calls:rows,yardTrucks:[],source,delayDays:rows.length?(delayByCall.get(rows[0].id)||0):0,delayEvents:cargoEvents.filter(e=>rows.some(c=>c.id===e.callId)).slice(-4).reverse()});
     }
     if(req.method==='GET' && route==='cargo'){
-      await getPncSchedule();
       const callId=url.searchParams.get('call')||stateForCallId(url);
       return json(res,200,{selfId:session.id,items:cargoItems.filter(v=>!v.delivered),delayDays:delayByCall.get(callId)||0,events:cargoEvents.filter(e=>e.callId===callId).slice(-8).reverse()});
     }
@@ -211,11 +210,13 @@ const server=http.createServer(async(req,res)=>{
         return json(res,200,{ok:true});
       }
       if(route==='cargo'){
-        await getPncSchedule();
         const item=cargoItems.find(v=>v.id===body.itemId&&!v.delivered);
         if(!item)return json(res,404,{error:'화물을 찾을 수 없습니다.'});
         const callId=String(body.callId||'');
-        if(!calls.some(c=>c.id===callId))return json(res,404,{error:'모선을 먼저 선택해 주세요.'});
+        if(!calls.some(c=>c.id===callId)){
+          await getPncSchedule();
+          if(!calls.some(c=>c.id===callId))return json(res,404,{error:'모선을 먼저 선택해 주세요.'});
+        }
         if(body.mode==='pickup'){
           if(item.carrierId&&item.carrierId!==session.id)return json(res,409,{error:'다른 작업자가 이미 운반 중인 화물입니다.'});
           item.carrierId=session.id;
