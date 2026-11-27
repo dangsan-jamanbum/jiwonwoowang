@@ -1,5 +1,5 @@
 import * as THREE from './vendor/three.module.js';
-import { makeWorker, makeGuardian } from './harbor-figures.js?v=16';
+import { makeWorker, makeGuardian } from './harbor-figures.js?v=17';
 import { buildHarbor } from './harbor-set.js?v=22';
 import { CY_STACK_BOUNDS } from './cy-yard.js';
 import { buildGuardianCourt } from './guardian-court.js';
@@ -9,7 +9,7 @@ import { PALM_CONTACTS, PALM_DURATION, palmPose } from './palm-beats.js';
 import { CHEER_PEAKS, CHEER_DURATION, cheerPose, mountCheers } from './shrine-gesture.js?v=16';
 import { mountTerminalMarquee, TERMINAL_WALL, TERMINAL_WALL_BOUNDS } from './terminal-marquee.js?v=17';
 import { buildDepartureOffice } from './departure-office.js?v=24';
-import { buildHarborLife } from './harbor-life.js?v=19';
+import { buildHarborLife } from './harbor-life.js?v=20';
 import { buildPortVehicles } from './port-vehicles.js?v=3';
 
 const { Vector3: V3 } = THREE;
@@ -267,6 +267,14 @@ export function mountWalk3D(container, options={}) {
     fig.dispose?.();
   }
   let profile=options.profile || {},style=profile.style==='vest'?'vest':'cardigan', local=addFigure(style);
+  const sharkDishProp=new THREE.Group();sharkDishProp.name='손에 든 상어 요리';local.handR.add(sharkDishProp);sharkDishProp.position.set(0,.018,.055);sharkDishProp.visible=false;
+  const dishBowl=new THREE.Mesh(new THREE.CylinderGeometry(.105,.085,.035,16),new THREE.MeshStandardMaterial({color:'#f1e5ce',roughness:.72}));dishBowl.position.y=.018;sharkDishProp.add(dishBowl);
+  const dishFoods={
+    steak:new THREE.Mesh(new THREE.BoxGeometry(.13,.038,.085),new THREE.MeshStandardMaterial({color:'#a85b43',roughness:.83})),
+    soup:new THREE.Mesh(new THREE.CylinderGeometry(.071,.071,.012,14),new THREE.MeshStandardMaterial({color:'#dcae63',roughness:.55})),
+    sashimi:new THREE.Mesh(new THREE.SphereGeometry(.065,12,8),new THREE.MeshStandardMaterial({color:'#e9958b',roughness:.7}))
+  };
+  for(const [kind,food] of Object.entries(dishFoods)){food.position.set(0,.045,.018);food.visible=false;sharkDishProp.add(food);}
   const spawn=set.spawn || {x:6,z:8,yaw:2.2};
   const spawnAngle=Math.random()*Math.PI*2,spawnRadius=.32+.58*Math.random();
   const startX=spawn.x+Math.cos(spawnAngle)*spawnRadius,startZ=spawn.z+Math.sin(spawnAngle)*spawnRadius;
@@ -854,7 +862,7 @@ export function mountWalk3D(container, options={}) {
   }
   function eatFishcake(){
     if(disposed||blocked()||!nearEomuk(player)||seated||gestureLocked()||aligning||currentAction?.mode==='eat')return false;
-    cancelPlan();currentAction={mode:'eat',start:time,id:crypto.randomUUID()};localSignal=null;return true;
+    cancelPlan();currentAction={mode:'eat',food:'eomuk',start:time,id:crypto.randomUUID()};localSignal=null;return true;
   }
   function act(mode) {
     if(mode==='eat')return eatFishcake();
@@ -1009,6 +1017,38 @@ export function mountWalk3D(container, options={}) {
     heading=yawTo(player,sharkPool);cameraYaw=heading+Math.PI;
     openingVista=false;railView='shark';
   }
+  let selectedSharkDish='steak';
+  const sharkMenu=element('section','position:absolute;z-index:40;left:50%;bottom:13%;transform:translateX(-50%);width:min(340px,calc(100% - 30px));padding:16px;border:1px solid #e7c58e;border-radius:18px;background:rgba(31,48,47,.96);box-shadow:0 12px 34px #081c20a8;color:#fff5df;font:600 14px/1.45 system-ui;pointer-events:auto;');
+  sharkMenu.hidden=true;sharkMenu.setAttribute('aria-label','상어 요리 메뉴');host.append(sharkMenu);
+  function hideSharkMenu(){sharkMenu.hidden=true;sharkMenu.replaceChildren();}
+  function showSharkMenu(stage){
+    sharkMenu.replaceChildren();
+    const title=element('div','font-size:17px;font-weight:850;margin:0 0 10px;text-align:center;');
+    title.textContent=stage==='choose'?'상어 요리 고르기':'요리가 완성됐어요!';
+    sharkMenu.append(title);
+    const addChoice=(label,action)=>{
+      const button=element('button','display:block;width:100%;margin:7px 0;padding:11px 13px;border:1px solid #d6b77e;border-radius:12px;background:#f3d9a7;color:#4b392b;font:800 14px system-ui;cursor:pointer;');
+      button.type='button';button.textContent=label;button.addEventListener('click',action);sharkMenu.append(button);
+    };
+    if(stage==='choose'){
+      addChoice('🥩 상어 스테이크',()=>chooseSharkDish('steak'));
+      addChoice('🍲 상어 수프',()=>chooseSharkDish('soup'));
+      addChoice('🍣 상어회',()=>chooseSharkDish('sashimi'));
+    }else addChoice('🍽️ 요리 먹기',startEatingShark);
+    addChoice('닫기',hideSharkMenu);
+    sharkMenu.hidden=false;
+  }
+  function chooseSharkDish(dish){
+    if(!harborLife.chooseSharkDish?.(dish))return;
+    selectedSharkDish=dish;hideSharkMenu();
+    for(const [kind,food] of Object.entries(dishFoods))food.visible=kind===dish;
+    options.onHint?.((dish==='steak'?'상어 스테이크':dish==='soup'?'상어 수프':'상어회')+'를 요리하고 있어요. 잠시 기다려 주세요.');
+  }
+  function startEatingShark(){
+    if(!harborLife.beginEatingShark?.())return;
+    hideSharkMenu();cancelPlan();currentAction={mode:'eat',food:'shark',dish:selectedSharkDish,start:time,id:crypto.randomUUID()};localSignal=null;
+    options.onHint?.('손에 든 상어 요리를 먹는 중이에요!');
+  }
   function watchShark() {
     if(!active||disposed||distance(player,zones.shark)>zones.shark.radius)return false;
     if(railView!=='shark')frameSharkFromHere();
@@ -1019,17 +1059,15 @@ export function mountWalk3D(container, options={}) {
     }else if(result==='cast')options.onHint?.('미끼를 던졌어요. 상어가 물 때까지 잠깐 기다려요.');
     else if(result==='waiting')options.onHint?.('미끼를 물 때까지 기다려요. 물면 E키를 빠르게 연타!');
     else if(result==='reeling')options.onHint?.('좋아! 낚싯줄을 당기는 중이에요. 계속 E키 연타!');
-    else if(result==='caught')options.onHint?.('상어를 낚았어요! 눈이 X가 됐어요. E키를 한 번 더 눌러 들어 올리세요.');
+    else if(result==='caught'){options.onFishCaught?.();options.onHint?.('상어를 낚았어요! 눈이 X가 됐어요. E키를 한 번 더 눌러 들어 올리세요.');}
     else if(result==='carrying')options.onHint?.('상어를 들고 있어요. 포장마차로 가서 E키를 눌러 건네주세요.');
-    else if(result==='cooked')options.onHint?.('상어회가 완성됐어요! 포장마차에서 E키를 눌러 먹어보세요.');
-    else if(result==='eaten'){options.onFishEaten?.();options.onHint?.('바다를 다시 바라보세요. 아기 상어가 엄마를 찾고 있어요.');}
     return true;
   }
   function interactSharkAtStall(){
     if(!active||disposed||distance(player,zones.eomuk)>zones.eomuk.radius)return false;
     const result=harborLife.interactSharkAtStall?.();
-    if(result==='delivered')options.onHint?.('상어를 포장마차에 건넸어요. 요리하는 중이에요!');
-    else if(result==='eaten'){options.onFishEaten?.();options.onHint?.('상어회를 먹었어요… 바다 쪽에서 아기 상어 울음소리가 들려요.');}
+    if(result==='menu'){showSharkMenu('choose');options.onHint?.('상어를 포장마차에 건넸어요. 요리를 골라 주세요.');}
+    else if(result==='eatMenu'){showSharkMenu('eat');}
     else return false;
     return true;
   }
@@ -1350,8 +1388,13 @@ export function mountWalk3D(container, options={}) {
     const smokeAge=action?.mode==='smoke'?(performance.now()-action.smokeAt)/1000:-1;
     const smoking=smokeAge>=0&&smokeAge<SMOKE_DURATION&&nearSmoking(player);
     if(action?.mode==='smoke'&&!smoking)currentAction=null;
-    const eating=action?.mode==='eat'&&nearEomuk(player)&&age<EAT_DURATION;
-    if(action?.mode==='eat'&&!eating)currentAction=null;
+    const eating=action?.mode==='eat'&&(action.food==='shark'||nearEomuk(player))&&age<EAT_DURATION;
+    if(action?.mode==='eat'&&!eating){
+      if(action.food==='shark'&&age>=EAT_DURATION&&harborLife.finishEatingShark?.()){
+        options.onFishEaten?.();options.onHint?.('요리를 다 먹었어요. 큰 북항이 상어가 바다로 돌아왔어요.');
+      }
+      currentAction=null;
+    }
     let pull=action?.mode==='pull'?pullPulse(age):0,coffee=0,phone=0;
     if(action?.mode==='coffee'||action?.mode==='phone') {
       const t=Math.min(1,age/2.25);const strength=Math.sin(Math.PI*t);
@@ -1374,7 +1417,8 @@ export function mountWalk3D(container, options={}) {
     }
     local.group.rotation.y=heading;
     const praying=action?.mode==='cheer';
-    local.animate({time,walk:praying||seated?0:walkMix,walkPhase,sit:seatBlend,seatHeight:lastSeat?lastSeat.y-player.y:undefined,...slap,...(praying?cheerPose(age):{}),pull,coffee,phone,...smokingPose(smoking?smokeAge:-1),eat:eating?bitePose(age):0});updateShadow(local);
+    local.animate({time,walk:praying||seated?0:walkMix,walkPhase,sit:seatBlend,seatHeight:lastSeat?lastSeat.y-player.y:undefined,...slap,...(praying?cheerPose(age):{}),pull,coffee,phone,...smokingPose(smoking?smokeAge:-1),eat:eating?bitePose(age):0});
+    const sharkEating=eating&&action?.food==='shark';if(local.eomuk)local.eomuk.visible=eating&&!sharkEating;sharkDishProp.visible=Boolean(sharkEating);updateShadow(local);
     paintBreath(local,smoking?smokeAge:-1);
     if(praying){
       while(action.beats<CHEER_PEAKS.length && age>=CHEER_PEAKS[action.beats]){
@@ -1460,7 +1504,7 @@ export function mountWalk3D(container, options={}) {
     if(celebration>7)feedback.hidden=true;
     set.update?.({time,night,push:shipPush,pull:shipPull,departure:0});
     court.update(time,night,reduceMotion);
-    marquee.update(time);office.update(time,distance(player,office.approach)<8);const fishEvent=harborLife.update(time,night,reduceMotion);if(fishEvent==='cooked'){options.onFishCooked?.();options.onHint?.('상어회가 완성됐어요! 포장마차에서 먹을 수 있어요.');}portVehicles.update(Date.now()/1000);
+    marquee.update(time);office.update(time,distance(player,office.approach)<8);const fishEvent=harborLife.update(time,night,reduceMotion);if(fishEvent==='cooked'){options.onFishCooked?.();showSharkMenu('eat');options.onHint?.('요리가 완성됐어요! 메뉴에서 먹기를 눌러 주세요.');}portVehicles.update(Date.now()/1000);
   }
   let frame=0,last=performance.now();
   function tick(stamp) {
