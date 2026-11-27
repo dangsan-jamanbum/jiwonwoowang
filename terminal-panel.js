@@ -1,0 +1,1 @@
+export function renderTerminalPanel(root,ctx={}){root.innerHTML='<h3>터미널 선적 현황</h3><p>현재 터미널의 선박과 야드 현황을 불러옵니다.</p><div id="terminal-list"></div>';const out=root.querySelector('#terminal-list');for(const c of ctx.state?.calls||[]){const p=document.createElement('p');p.textContent=(c.name||'선박')+' · '+(c.voy||'항차 미정');out.append(p);}return ()=>{};}
