@@ -498,7 +498,7 @@ const server=http.createServer(async(req,res)=>{
         const peers=[...presence.values()].filter(p=>p.terminal===body.terminal&&p.callId===body.callId);
         return json(res,200,{selfId,selfName:entry.name,serverTime:Date.now(),online:peers.length,
           cargoItems:cargoItems.filter(v=>!v.delivered),
-          sashimiPlateFull,
+          sashimiPlateFull,sharkEaten,
           peers:peers.filter(p=>p.selfId!==selfId).map(p=>({id:p.selfId,avatarId:p.selfId,name:p.name,style:p.style,x:p.x||0,y:p.y||0,z:p.z||0,yaw:p.yaw||0,motion:p.motion||'idle',cargoId:p.cargoId||null,actionId:p.actionId||null,updatedAt:p.seenAt}))});
       }
     }
