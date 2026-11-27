@@ -70,48 +70,73 @@ function normalizePncCalls(rawCalls){
 }
 function parsePncSchedule(payload){
   const source=String(payload??'').trim();
-  // 일부 PNC 중계 응답은 calls 배열을 가진 JSON으로 제공된다.
-  if(source.startsWith('{')||source.startsWith('[')){
-    const parsed=JSON.parse(source);
-    const rows=Array.isArray(parsed)?parsed:parsed.calls;
-    if(Array.isArray(rows)&&rows.length)return normalizePncCalls(rows);
+  // API/중계 응답이 calls 배열 JSON으로 오는 경우 원본 필드를 보존한다.
+  const jsonStart=source.indexOf('{');
+  if(jsonStart>=0){
+    try{
+      const parsed=JSON.parse(source.slice(jsonStart));
+      const rows=Array.isArray(parsed)?parsed:parsed.calls;
+      if(Array.isArray(rows)&&rows.length)return normalizePncCalls(rows);
+    }catch{}
   }
-  // 공식 MN014 페이지의 선석배정 표: No., 모선명, 모선코드,
-  // 선사항차, 운항선사, 항로, 접안방향, 접안/예정, 출항/예정, 선석...
-  const rows=[...source.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)];
+  // PNC MN014 실제 표는 No.부터 업데이트 일시까지 17개 열로 제공된다.
+  // td 개수/첫 열의 태그 형태가 바뀌어도 모선코드(예: ANEM-003/2026)를 기준으로 찾는다.
+  const htmlRows=[...source.matchAll(/<tr\\b[^>]*>([\\s\\S]*?)<\\/tr>/gi)];
   const found=[];
-  for(const row of rows){
-    const cells=[...row[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map(m=>cellText(m[1]));
-    if(cells.length<10||!/^\d+$/.test(cells[0]))continue;
-    const name=cells[1],terminalVoy=cells[2],carrierVoy=cells[3],operator=cells[4],route=cells[5];
-    if(!name||!/[A-Z0-9-]+\s*\/\s*20\d{2}/i.test(terminalVoy))continue;
+  for(const row of htmlRows){
+    const cells=[...row[1].matchAll(/<t[dh]\\b[^>]*>([\\s\\S]*?)<\\/t[dh]>/gi)].map(m=>cellText(m[1]));
+    const codeIndex=cells.findIndex(v=>/^[A-Z0-9-]+\\s*\\/\\s*20\\d{2}$/i.test(v));
+    if(codeIndex<1)continue;
+    const name=cells[codeIndex-1]||'';
+    const terminalVoy=cells[codeIndex]||'';
+    const carrierVoy=cells[codeIndex+1]||'';
+    const operator=cells[codeIndex+2]||'';
+    const route=cells[codeIndex+3]||'';
+    if(!name||!carrierVoy)continue;
     const [inboundVoy='',outboundVoy='']=carrierVoy.split('/').map(v=>v.trim());
-    const etb=pncDate(cells[7]),etd=pncDate(cells[8]);
-    // MN014 공개 표의 접안/출항 시각은 예정 시각이다.
-    // 실제 접안/출항 확인값이 없으므로 시각만으로 운항 상태를 추정하지 않는다.
-    const berthPhase='scheduled';
+    const etb=pncDate(cells[codeIndex+5]);
+    const etd=pncDate(cells[codeIndex+6]);
     const terminalCode=terminalVoy.split('/')[0].trim();
-    const year=(terminalVoy.match(/20\d{2}/)||[])[0];
-    const discharge=Number(String(cells[11]||'').replace(/,/g,''))||0;
-    const load=Number(String(cells[12]||'').replace(/,/g,''))||0;
-    const shift=Number(String(cells[13]||'').replace(/,/g,''))||0;
+    const year=(terminalVoy.match(/20\\d{2}/)||[])[0];
+    const discharge=Number(String(cells[codeIndex+9]||'').replace(/,/g,''))||0;
+    const load=Number(String(cells[codeIndex+10]||'').replace(/,/g,''))||0;
+    const berth=cells[codeIndex+7]||'미정';
+    const checkedAt=new Date().toISOString();
     found.push({
       id:'official.busan.pnc.'+terminalCode+'.'+year,name,voy:outboundVoy||inboundVoy,
       carrierVoy,terminalVoy,inboundVoy,outboundVoy,operator,route,port:'busan',terminal:'pnc',
-      berth:cells[9]||'미정',loading:{plan:load,workTotal:null,completed:null,
-        remainingVan:null,remainingMoves:null,workUnit:null,completedUnit:null,
-        planSourceUrl:PNC_BERTH_URL,workSourceUrl:null,checkedAt:new Date().toISOString(),workCheckedAt:null},
-      eta:null,etb,atb:null,etd,atd:null,atdVerified:false,berthPhase,
-      rawStatus:berthPhase==='departed'?'출항':'예정',
-      status:berthPhase==='departed'?'출항':'접안 예정',isDemo:false,
+      berth,loading:{plan:load,workTotal:null,completed:null,remainingVan:null,
+        remainingMoves:null,workUnit:null,completedUnit:null,
+        planSourceUrl:PNC_BERTH_URL,workSourceUrl:null,checkedAt,workCheckedAt:null},
+      eta:null,etb,atb:null,etd,atd:null,atdVerified:false,berthPhase:'scheduled',
+      rawStatus:'예정',status:'접안 예정',isDemo:false,
       source:'부산신항만 PNC 선석배정현황',sourceUrl:PNC_BERTH_URL,
-      updatedAt:pncDate(cells[16]),checkedAt:new Date().toISOString(),atbSourceUrl:null
+      updatedAt:pncDate(cells[codeIndex+14]),checkedAt,atbSourceUrl:null
     });
   }
   const unique=[...new Map(found.map(c=>[c.id,c])).values()];
-  if(!unique.length)throw new Error('PNC 공식 MN014 선석배정 표에서 선박 행을 찾지 못했습니다.');
-  return unique;
+  if(unique.length)return unique;
+  // 일부 응답은 태그 대신 표의 텍스트만 포함하므로 행 텍스트도 보조로 검사한다.
+  const text=cellText(source.replace(/<\\/(?:tr|td|th|div|p)>/gi,'\\n'));
+  const lines=text.split(/\\n+/).map(v=>v.trim()).filter(Boolean);
+  for(let i=0;i<lines.length;i++){
+    const match=lines[i].match(/^(.+?)\\s+([A-Z0-9-]+\\/20\\d{2})\\s+([A-Z0-9/]+)\\s+([A-Z]{2,4})\\s+([A-Z0-9 ]+)\\s+(Port|Star)\\s+(20\\d{2}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2})\\s+(20\\d{2}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2})\\s+(B\\d+)/i);
+    if(!match)continue;
+    const [,name,terminalVoy,carrierVoy,operator,route,,etbText,etdText,berth]=match;
+    const [inboundVoy='',outboundVoy='']=carrierVoy.split('/');
+    const terminalCode=terminalVoy.split('/')[0],year=(terminalVoy.match(/20\\d{2}/)||[])[0];
+    found.push({id:'official.busan.pnc.'+terminalCode+'.'+year,name,terminal:'pnc',port:'busan',
+      terminalVoy,carrierVoy,inboundVoy,outboundVoy,voy:outboundVoy||inboundVoy,operator,route,berth,
+      etb:pncDate(etbText),etd:pncDate(etdText),atb:null,atd:null,atdVerified:false,
+      berthPhase:'scheduled',rawStatus:'예정',status:'접안 예정',isDemo:false,
+      loading:{plan:null,workTotal:null,completed:null,remainingVan:null,remainingMoves:null},
+      source:'부산신항만 PNC 선석배정현황',sourceUrl:PNC_BERTH_URL,checkedAt:new Date().toISOString()});
+  }
+  const fallbackUnique=[...new Map(found.map(c=>[c.id,c])).values()];
+  if(!fallbackUnique.length)throw new Error('공식 PNC 페이지 응답에서 선박 표 행을 찾지 못했습니다. 응답 형식 또는 접근 제한을 확인해야 합니다.');
+  return fallbackUnique;
 }
+
 function pncFallback(){
   return [];
 }
