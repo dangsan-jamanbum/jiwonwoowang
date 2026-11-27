@@ -14,7 +14,7 @@ const calls = [
   { id:'demo-pnit-001', terminal:'pnit', name:'ATD 북항 연습선', voy:'DEMO-002', outboundVoy:'DEMO-002', inboundVoy:'DEMO-002', carrierVoy:'DEMO-002', berth:'연습 부두', berthPhase:'alongside', etd:null, etb:null, atd:null, atdVerified:false, isDemo:true }
 ];
 
-function cookieSession(req,res){
+function cookieSession(req, res){
   const raw = req.headers.cookie || '';
   let id = raw.split(';').map(v=>v.trim()).find(v=>v.startsWith('atd-session='))?.slice(12);
   if(!id || !/^[a-zA-Z0-9_-]{12,80}$/.test(id)){
@@ -66,7 +66,8 @@ const server=http.createServer(async(req,res)=>{
   if(req.method==='OPTIONS'){res.writeHead(204,{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type, X-ATD-Browser','Access-Control-Allow-Methods':'GET, POST, OPTIONS'});return res.end();}
   const url=new URL(req.url,'http://localhost');
   if(!url.pathname.startsWith('/api/')) return sendStatic(req,res);
-  const session=cookieSession(req,res);
+  // Pass both request and response: cookieSession writes Set-Cookie to res.
+  const session = cookieSession(req, res);
   try{
     const route=url.pathname.slice(5);
     if(req.method==='GET' && route==='state') return json(res,200,stateFor(session,url));
