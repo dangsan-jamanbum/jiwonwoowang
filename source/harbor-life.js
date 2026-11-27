@@ -62,8 +62,9 @@ export function buildHarborLife(T, scene) {
   cyl(sashimiPlate,'#668c80',0,.057,0,.57,.025);
   cyl(sashimiPlate,'#f3e8d3',0,.072,0,.49,.012);
   const sashimiSlices=[];
+  let sashimiVisible=false;
   function fillSashimiPlate(){
-    if(sashimiSlices.length)return;
+    if(sashimiSlices.length){sashimiSlices.forEach(v=>v.visible=true);sashimiVisible=true;return;}
     for(let i=0;i<27;i++){
       const ring=i<9?0:i<18?1:2,slot=i%9,angle=slot*Math.PI*2/9+ring*.18,radius=.13+ring*.145;
       const x=Math.cos(angle)*radius,z=Math.sin(angle)*radius;
@@ -75,6 +76,7 @@ export function buildHarborLife(T, scene) {
       const leaf=ellipsoid(sashimiPlate,'#6d9a68',-.40+i*.075,.105,.30,.13,.018,.045);
       leaf.rotation.y=-.48+i*.22;
     }
+    sashimiVisible=true;
   }
   box(booth,'#cda678',0,1.15,.807,3.55,.065,.045);
   box(booth,'#8e5c43',0,.395,.71,3.38,.12,.095);
@@ -279,23 +281,69 @@ export function buildHarborLife(T, scene) {
       [[s*spread,.035,start],[s*(spread+.19),.035,start*.54+end*.46],[s*(spread+.21+.10*j),.035,end]],j===0?.029:.023,10);
     w.renderOrder=2;wakePieces.push(w);
   }
-  const dayTransmission=new T.Color('#84acb4'),nightTransmission=new T.Color('#507e91');
-  let sceneTime=0,fishingStartedAt=null,plateFilled=false;
-  function setSashimiPlate(){
-    fishingStartedAt=null;plateFilled=true;fillSashimiPlate();
+  const xMarks=new T.Group();xMarks.name='잡힌 상어의 X 눈';animal.add(xMarks);
+  for(const side of [-1,1]){
+    const x=side*.465,y=.205,z=1.153;
+    curve(xMarks,'#253b43',[[x-.052,y-.052,z+.012],[x+.052,y+.052,z+.012]],.022,5);
+    curve(xMarks,'#253b43',[[x-.052,y+.052,z+.012],[x+.052,y-.052,z+.012]],.022,5);
   }
+  xMarks.visible=false;
+  const tongue=ellipsoid(animal,'#e85d70',0,-.145,1.895,.105,.052,.16);tongue.name='낼름 나온 혀';tongue.visible=false;
+  const babyShark=new T.Group();babyShark.name='엄마를 찾는 아기 상어';group.add(babyShark);
+  const babyAnimal=animal.clone(true);babyShark.add(babyAnimal);babyAnimal.scale.setScalar(.38);
+  const tears=[];
+  for(const side of [-1,1]){
+    const tear=ellipsoid(babyAnimal,'#72c9ed',side*.175,.12,1.205,.035,.085,.035);tear.name='아기 상어 눈물';tears.push(tear);
+  }
+  const dayTransmission=new T.Color('#84acb4'),nightTransmission=new T.Color('#507e91');
+  let sceneTime=0,fishingState='idle',baitAt=0,reelHits=0,plateFilled=false,cookedAt=0,carryParent=null;
+  function setSashimiPlate(){fishingState='cooked';plateFilled=true;fillSashimiPlate();}
   function fishShark(){
-    if(plateFilled)return 'full';
-    if(fishingStartedAt!==null)return 'busy';
-    fishingStartedAt=sceneTime;return 'started';
+    if(fishingState==='idle'){fishingState='casting';baitAt=sceneTime+2.0;return 'cast';}
+    if(fishingState==='casting')return 'waiting';
+    if(fishingState==='bite'){
+      reelHits++;
+      if(reelHits>=9){fishingState='caught';xMarks.visible=true;tongue.visible=true;return 'caught';}
+      return 'reeling';
+    }
+    if(fishingState==='caught')return 'ready';
+    if(fishingState==='carried')return 'carrying';
+    if(fishingState==='cooking')return 'cooking';
+    if(fishingState==='cooked')return 'cooked';
+    if(fishingState==='eaten')return 'eaten';
+    return 'waiting';
+  }
+  function pickUpShark(parent){
+    if(fishingState!=='caught'||!parent)return false;
+    carryParent=parent;shark.parent?.remove(shark);parent.add(shark);
+    shark.position.set(0,1.05,.68);shark.rotation.set(0,Math.PI,0);shark.scale.setScalar(.43);
+    shark.visible=true;fishingState='carried';return true;
+  }
+  function deliverShark(){
+    if(fishingState!=='carried')return false;
+    shark.visible=false;carryParent=null;fishingState='cooking';cookedAt=sceneTime+3.8;return true;
+  }
+  function eatShark(){
+    if(fishingState!=='cooked')return false;
+    fishingState='eaten';plateFilled=false;sashimiSlices.forEach(v=>v.visible=false);
+    babyShark.visible=true;return true;
+  }
+  function interactSharkAtStall(){
+    if(fishingState==='carried')return deliverShark()?'delivered':false;
+    if(fishingState==='cooked')return eatShark()?'eaten':false;
+    return false;
   }
   function update(time=0,night=0,reduced=false){
     sceneTime=Number.isFinite(time)?time:sceneTime;
-    let caughtNow=false,jump=0;
-    if(fishingStartedAt!==null){
-      const progress=(sceneTime-fishingStartedAt)/2.65;
-      if(progress<1)jump=Math.sin(Math.max(0,progress)*Math.PI)*2.45;
-      else{fishingStartedAt=null;plateFilled=true;fillSashimiPlate();caughtNow=true;}
+    let event=null,jump=0;
+    if(fishingState==='casting'&&sceneTime>=baitAt)fishingState='bite';
+    if(fishingState==='bite')jump=.10+.08*Math.sin(sceneTime*12);
+    if(fishingState==='cooking'&&sceneTime>=cookedAt){fishingState='cooked';plateFilled=true;fillSashimiPlate();event='cooked';}
+    if(fishingState==='eaten'){
+      babyShark.visible=true;
+      babyShark.position.set(-24.8+2.25*Math.sin(sceneTime*.12),SEA_LEVEL+.04,30.55+4.1*Math.cos(sceneTime*.12));
+      babyShark.rotation.y=Math.sin(sceneTime*.12)*.24;
+      tears.forEach((tear,i)=>{tear.position.y=.12+.045*Math.abs(Math.sin(sceneTime*4+i));});
     }
     const t=reduced?7:Number.isFinite(time)?time:0,n=Math.max(0,Math.min(1,Number(night)||0));
     for(let i=0;i<steam.length;i++){
@@ -307,13 +355,15 @@ export function buildHarborLife(T, scene) {
     // The west side of the quay is clear from the stall to the new shoreline
     // return. A short patrol keeps both the bow and tail in this open water.
     const a=t*.18+.66,rx=1.48,rz=3.20;
-    shark.position.set(-24.8+rx*Math.sin(a),SEA_LEVEL+jump,30.55+rz*Math.cos(a));
-    shark.rotation.y=Math.atan2(rx*Math.cos(a),-rz*Math.sin(a));
+    if(fishingState!=='carried'&&fishingState!=='cooking'&&fishingState!=='cooked'&&fishingState!=='eaten'){
+      shark.position.set(-24.8+rx*Math.sin(a),SEA_LEVEL+jump,30.55+rz*Math.cos(a));
+      shark.rotation.y=Math.atan2(rx*Math.cos(a),-rz*Math.sin(a));
+    }
     animal.position.y=-.083+.048*Math.sin(a*1.8);animal.rotation.z=.038*Math.sin(a);animal.rotation.x=.025*Math.sin(t*1.12);
     tailPivot.rotation.y=.27*Math.sin(t*1.95);echoTail.rotation.y=tailPivot.rotation.y;
     for(let i=0;i<wakePieces.length;i++){const w=wakePieces[i];w.material.opacity=(.60+.13*Math.sin(t*.90-i*.86))*(1-.16*n);w.position.z=.065*Math.sin(t*1.28-i*.46);}
     refract.color.copy(dayTransmission).lerp(nightTransmission,n);detail.color.copy(refract.color).multiplyScalar(1.08);
-    return caughtNow;
+    return event;
   }
   function blocks(x,z){
     if(Math.abs(x-STALL.x)<1.09 && Math.abs(z-STALL.z)<1.93)return true;
@@ -321,5 +371,5 @@ export function buildHarborLife(T, scene) {
     return Math.abs(dx*c-dz*s)<.58&&Math.abs(dx*s+dz*c)<.29;
   }
   function dispose(){scene.remove(group);resources.forEach(resource=>resource.dispose());resources.clear();}
-  update();return {group,booth,shark,sharkWatch:SHARK_WATCH,approach:EOMUK_ZONE,blocks,update,fishShark,setSashimiPlate,dispose};
+  update();return {group,booth,shark,sharkWatch:SHARK_WATCH,approach:EOMUK_ZONE,blocks,update,fishShark,pickUpShark,interactSharkAtStall,setSashimiPlate,dispose};
 }
