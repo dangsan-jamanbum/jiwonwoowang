@@ -130,10 +130,11 @@ async function ensureWorld(){
  worldReady=(async()=>{
   const cargoState=await api('cargo?call='+encodeURIComponent(state.selected?.id||''));
   if(cargoState.selfId)selfAvatarId=cargoState.selfId;
-  const m=await import('./walk3d.js?v=28');
+  const m=await import('./walk3d.js?v=29');
   world=m.mountWalk3D($('#world'),{
     profile:state.profile||{name:'나',style:'cardigan'},active:true,onHint:toast,
     cargoItems:cargoState.items||[],cargoSelfId:cargoState.selfId,
+    onFishCaught:()=>{api('fishing',{mode:'caught'}).catch(()=>{});},
     onFishCooked:()=>{api('fishing',{mode:'cooked'}).catch(()=>{});},
      onFishEaten:()=>{api('fishing',{mode:'eaten'}).catch(()=>{});},
     onCargoAction:async(mode,itemId,position)=>{
@@ -507,7 +508,7 @@ function startPresence(){
     }
     return {...pose,style:state.profile?.style||'cardigan',motion:['push','pull'].includes(pose.motion)?'idle':pose.motion,actionId:null};
   },
-  onPeers:(rows,serverTime,snapshot)=>{world?.setLivePeers?.(rows,serverTime);if(snapshot?.cargoItems)world?.setCargo?.(snapshot.cargoItems,snapshot.selfId);if(typeof snapshot?.sashimiPlateFull==='boolean')world?.setSashimiPlate?.(snapshot.sashimiPlateFull,!!snapshot.sharkEaten);},
+  onPeers:(rows,serverTime,snapshot)=>{world?.setLivePeers?.(rows,serverTime);if(snapshot?.cargoItems)world?.setCargo?.(snapshot.cargoItems,snapshot.selfId);if(typeof snapshot?.sashimiPlateFull==='boolean')world?.setSashimiPlate?.(snapshot.sashimiPlateFull,!!snapshot.sharkEaten,!!snapshot.sharkCaught);},
   onStatus:status=>{selfAvatarId=status.selfId;}
  });
 }
