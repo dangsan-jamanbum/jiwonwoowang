@@ -238,26 +238,9 @@ export function buildGuardianCourt(T,scene){
   }
   // Higgsfield quarry sample. Only its mineral surface is used; the border,
   // inscription, cavity height and chisel shading are generated per statue.
-  let quarryImage=null;
-  if(typeof Image==='function'){
-    quarryImage=new Image();
-    quarryImage.onload=()=>{
-      if(grain){
-        const size=Math.min(quarryImage.naturalWidth||quarryImage.width,quarryImage.naturalHeight||quarryImage.height);
-        grain.drawImage(quarryImage,0,0,size,size,0,0,grainSize,grainSize);
-        const data=grain.getImageData(0,0,grainSize,grainSize);
-        for(let p=0;p<data.data.length;p+=4){
-          const d=data.data,shade=Math.max(82,Math.min(150,112+(d[p]*.32+d[p+1]*.53+d[p+2]*.15-119)*.43));
-          d[p]=shade-1;d[p+1]=shade+1;d[p+2]=shade;
-        }
-        grain.putImageData(data,0,0);stoneMap.needsUpdate=true;
-      }
-      for(const paint of graniteFaces)paint(quarryImage);
-      graniteFaces.length=0;
-    };
-    quarryImage.onerror=()=>{graniteFaces.length=0;};
-    quarryImage.src='/assets/guardian-granite.png';
-  }else graniteFaces.length=0;
+  // Optional quarry texture is omitted: the stone surface is generated locally,
+  // so the scene never requests a missing /assets/guardian-granite.png file.
+  graniteFaces.length=0;
   // Rotate the original tidal sculpture into the new shore frame; this keeps
   // each crest in the physical gap between its two neighbouring statues.
   const seaFrame=new T.Group();seaFrame.position.set(-5.15,2.58,49.20);seaFrame.rotation.y=pi;root.add(seaFrame);
