@@ -32,13 +32,13 @@ function decodeHtml(value){
     .replace(/&lt;/gi,'<').replace(/&gt;/gi,'>');
 }
 function cellText(html){
-  return decodeHtml(String(html??'').replace(/<br\\s*\\/?\\s*>/gi,' ')
-    .replace(/<[^>]*>/g,' ').replace(/\\s+/g,' ')).trim();
+  return decodeHtml(String(html??'').replace(/<br\s*\/?\s*>/gi,' ')
+    .replace(/<[^>]*>/g,' ').replace(/\s+/g,' ')).trim();
 }
 function pncDate(value){
   const s=String(value??'').trim();
   if(!s||s==='-'||s==='N/A')return null;
-  if(/^20\\d{2}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}/.test(s))return new Date(s.replace(' ','T')+':00+09:00').toISOString();
+  if(/^20\d{2}-\d{2}-\d{2}\s+\d{2}:\d{2}/.test(s))return new Date(s.replace(' ','T')+':00+09:00').toISOString();
   const d=new Date(s);
   return Number.isNaN(d.getTime())?null:d.toISOString();
 }
@@ -48,7 +48,7 @@ function normalizePncCalls(rawCalls){
     const loading=c.loading||{};
     const terminalVoy=String(c.terminalVoy||c.voy||'').trim();
     const code=(terminalVoy.split('/')[0]||terminalVoy).trim();
-    const year=(terminalVoy.match(/(20\\d{2})/)||[])[1]||String(new Date().getFullYear());
+    const year=(terminalVoy.match(/(20\d{2})/)||[])[1]||String(new Date().getFullYear());
     const carrier=String(c.carrierVoy||c.voy||'').split('/');
     const etb=c.etb||null,etd=c.etd||null;
     return {
@@ -78,20 +78,20 @@ function parsePncSchedule(payload){
   }
   // 공식 MN014 페이지의 선석배정 표: No., 모선명, 모선코드,
   // 선사항차, 운항선사, 항로, 접안방향, 접안/예정, 출항/예정, 선석...
-  const rows=[...source.matchAll(/<tr\\b[^>]*>([\\s\\S]*?)<\\/tr>/gi)];
+  const rows=[...source.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)];
   const found=[];
   for(const row of rows){
-    const cells=[...row[1].matchAll(/<t[dh]\\b[^>]*>([\\s\\S]*?)<\\/t[dh]>/gi)].map(m=>cellText(m[1]));
-    if(cells.length<10||!/^\\d+$/.test(cells[0]))continue;
+    const cells=[...row[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map(m=>cellText(m[1]));
+    if(cells.length<10||!/^\d+$/.test(cells[0]))continue;
     const name=cells[1],terminalVoy=cells[2],carrierVoy=cells[3],operator=cells[4],route=cells[5];
-    if(!name||!/[A-Z0-9-]+\\s*\\/\\s*20\\d{2}/i.test(terminalVoy))continue;
+    if(!name||!/[A-Z0-9-]+\s*\/\s*20\d{2}/i.test(terminalVoy))continue;
     const [inboundVoy='',outboundVoy='']=carrierVoy.split('/').map(v=>v.trim());
     const etb=pncDate(cells[7]),etd=pncDate(cells[8]);
     const now=Date.now(),etbMs=etb?Date.parse(etb):NaN,etdMs=etd?Date.parse(etd):NaN;
     const berthPhase=Number.isFinite(etdMs)&&now>etdMs?'departed':
       Number.isFinite(etbMs)&&now>=etbMs?'alongside':'scheduled';
     const terminalCode=terminalVoy.split('/')[0].trim();
-    const year=(terminalVoy.match(/20\\d{2}/)||[])[0];
+    const year=(terminalVoy.match(/20\d{2}/)||[])[0];
     const discharge=Number(String(cells[11]||'').replace(/,/g,''))||0;
     const load=Number(String(cells[12]||'').replace(/,/g,''))||0;
     const shift=Number(String(cells[13]||'').replace(/,/g,''))||0;
