@@ -2,7 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { onHarborLand, CY_STACK_BOUNDS } from './source/cy-yard.js';
+import { onHarborLand, CY_STACK_BOUNDS, WALK_AREAS } from './source/cy-yard.js';
 
 const PORT = Number(process.env.PORT || 10000);
 const ROOT = process.cwd();
@@ -24,28 +24,31 @@ const cancelCargoTypes = [
   ['equipment','야드 장비 추가 배치'],['equipment','긴급 수리 공구 세트'],['equipment','선적 보조 설비 지원'],
   ['wrench','모선 결함 상쇄']
 ];
-function makeCargoSpawnPoints(count,starterCount=48){
-  let seed=0x5a17c9;
-  const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+function makeCargoSpawnPoints(count){
   const points=[];
-  const valid=(x,z,minGap)=>{
+  const routeAreas=WALK_AREAS.map(([minX,maxX,minZ,maxZ])=>({
+    minX,maxX,minZ,maxZ,weight:(maxX-minX)*(maxZ-minZ)
+  }));
+  const totalWeight=routeAreas.reduce((sum,area)=>sum+area.weight,0);
+  const valid=(x,z)=>{
     if(!onHarborLand(x,z))return false;
     if(CY_STACK_BOUNDS.some(b=>x>=b.minX-1.05&&x<=b.maxX+1.05&&z>=b.minZ-1.05&&z<=b.maxZ+1.05))return false;
     if(Math.hypot(x+16.15,z-24.7)<4.6||Math.hypot(x+18.42,z-28.15)<2.8)return false;
     if(Math.hypot(x+5.15,z+36.4)<4.0)return false;
-    return !points.some(p=>Math.hypot(x-p.x,z-p.z)<minGap);
+    return !points.some(p=>Math.hypot(x-p.x,z-p.z)<2.05);
   };
-  // Put a visible mix of cargo types around the actual player spawn (6, 8).
-  for(let attempt=0;attempt<120000&&points.length<Math.min(count,starterCount);attempt++){
-    const angle=random()*Math.PI*2,radius=2.4+Math.sqrt(random())*12.5;
-    const x=6+Math.cos(angle)*radius,z=8+Math.sin(angle)*radius;
-    if(!valid(x,z,1.55))continue;
-    points.push({x,z,yaw:random()*Math.PI*2});
-  }
-  for(let attempt=0;attempt<240000&&points.length<count;attempt++){
-    const x=-42+random()*73,z=-108.4+random()*163.6;
-    if(!valid(x,z,1.55))continue;
-    points.push({x,z,yaw:random()*Math.PI*2});
+  // Sample every public walking-route rectangle, weighted by its walkable area.
+  // No spawn-area cluster: items are distributed across the whole route network.
+  for(let attempt=0;attempt<360000&&points.length<count;attempt++){
+    let pick=Math.random()*totalWeight,area=routeAreas[routeAreas.length-1];
+    for(const candidate of routeAreas){
+      pick-=candidate.weight;
+      if(pick<=0){area=candidate;break;}
+    }
+    const x=area.minX+Math.random()*(area.maxX-area.minX);
+    const z=area.minZ+Math.random()*(area.maxZ-area.minZ);
+    if(!valid(x,z))continue;
+    points.push({x,z,yaw:Math.random()*Math.PI*2});
   }
   if(points.length!==count)throw new Error('화물 배치 위치를 충분히 찾지 못했습니다: '+points.length+'/'+count);
   return points;
@@ -66,7 +69,7 @@ for(let i=cargoBlueprints.length-1;i>0;i--){
   const j=Math.floor(cargoMixRandom()*(i+1));
   [cargoBlueprints[i],cargoBlueprints[j]]=[cargoBlueprints[j],cargoBlueprints[i]];
 }
-const cargoSpawns=makeCargoSpawnPoints(cargoBlueprints.length,48);
+const cargoSpawns=makeCargoSpawnPoints(cargoBlueprints.length);
 const cargoItems=cargoBlueprints.map((item,i)=>({
   id:'cargo-pnc-'+String(i+1).padStart(4,'0'),...item,
   ...cargoSpawns[i],carrierId:null,delivered:false
