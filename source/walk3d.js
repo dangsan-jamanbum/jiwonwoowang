@@ -998,3 +998,272 @@ export function mountWalk3D(container, options={}) {
     cameraGuard.constrain(cameraOrigin,desired,radius,desired,camera.position,true);
     stopCameraAtWalls(cameraOrigin,desired,radius);
     if(initialCamera){camera.position.copy(desired);lookAt.copy(aim);initialCamera=false;}
+
+    camera.position.lerp(desired,initialCamera?1:1-Math.exp(-dt*7));
+    lookAt.lerp(aim,1-Math.exp(-dt*9));
+    camera.lookAt(lookAt);
+  }
+
+  const blocked=()=>!active||disposed;
+  let frameHandle=0,lastFrame=0,frameCount=0;
+  let pointerDown=null,dragging=false,lastPointerX=0,lastPointerY=0;
+  const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2(),groundPlane=new THREE.Plane(new V3(0,1,0),0),hitPoint=new V3();
+  const keyDown=e=>{
+    if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','w','a','s','d','W','A','S','D'].includes(e.key) && !/INPUT|TEXTAREA|SELECT/.test(e.target?.tagName||''))e.preventDefault();
+    keys.add(e.key.toLowerCase());
+    if(e.key==='Escape'){cancelPlan();keys.clear();}
+    if((e.key==='e'||e.key==='Enter')&&!e.repeat){
+      if(near==='smoking')toggleSeat();
+      else if(near==='eomuk')eatFishcake();
+      else if(near==='shark')watchShark();
+      else if(near==='departureOffice')replayDeparture();
+      else if(near==='arrival')actAtDock('pull');
+      else if(near==='departure')actAtDock('push');
+      else if(near==='shrine')options.onHint?.('수호자 앞에서 삼창할 수 있어요.');
+    }
+  };
+  const keyUp=e=>keys.delete(e.key.toLowerCase());
+  const pointerStart=e=>{
+    if(disposed)return;
+    pointerDown={x:e.clientX,y:e.clientY,id:e.pointerId,at:performance.now()};
+    lastPointerX=e.clientX;lastPointerY=e.clientY;dragging=false;
+    try{canvas.setPointerCapture(e.pointerId);}catch{}
+  };
+  const pointerMove=e=>{
+    if(!pointerDown||pointerDown.id!==e.pointerId)return;
+    const dx=e.clientX-lastPointerX,dy=e.clientY-lastPointerY;
+    if(Math.hypot(e.clientX-pointerDown.x,e.clientY-pointerDown.y)>5)dragging=true;
+    if(dragging){
+      cameraYaw-=dx*.0065;
+      cameraPitch=clamp(cameraPitch+dy*.004,-.02,1.02);
+      openingVista=false;if(railView==='shark')railView=null;
+      cancelPlan();lastMove=time;
+    }
+    lastPointerX=e.clientX;lastPointerY=e.clientY;
+  };
+  const pointerEnd=e=>{
+    if(!pointerDown||pointerDown.id!==e.pointerId)return;
+    const moved=dragging,elapsed=performance.now()-pointerDown.at;
+    if(!moved&&elapsed<420&&active&&!disposed){
+      const rect=canvas.getBoundingClientRect();
+      pointer.set(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);
+      raycaster.setFromCamera(pointer,camera);
+      if(raycaster.ray.intersectPlane(groundPlane,hitPoint)&&canWalk(hitPoint.x,hitPoint.z)){
+        autopilot({x:hitPoint.x,z:hitPoint.z},null,false,false);
+      }
+    }
+    pointerDown=null;dragging=false;
+  };
+  const wheel=e=>{e.preventDefault();zoomBy(e.deltaY>0?.09:-.09);};
+  const context=e=>e.preventDefault();
+  const blur=()=>{keys.clear();pointerDown=null;dragging=false;};
+  canvas.addEventListener('pointerdown',pointerStart);
+  canvas.addEventListener('pointermove',pointerMove);
+  canvas.addEventListener('pointerup',pointerEnd);
+  canvas.addEventListener('pointercancel',pointerEnd);
+  canvas.addEventListener('wheel',wheel,{passive:false});
+  canvas.addEventListener('contextmenu',context);
+  window.addEventListener('keydown',keyDown);
+  window.addEventListener('keyup',keyUp);
+  window.addEventListener('blur',blur);
+  canvas.addEventListener('keydown',keyDown);
+  canvas.addEventListener('keyup',keyUp);
+
+  function updateAction(dt){
+    if(!currentAction)return;
+    const action=currentAction,elapsed=time-action.start;
+    if(action.mode==='push'||action.mode==='pull'){
+      const duration=PALM_DURATION;
+      const pose=slapPoseAtFrame(action,elapsed);
+      local.group.userData.atdGesture=pose;
+      dispatchContacts(local,action,action.mode,elapsed,true,true);
+      if(elapsed>=duration){
+        const mode=action.mode;currentAction=null;localSignal=null;local.group.userData.atdGesture=null;
+        options.onDockGestureEnd?.(mode);
+      }
+    }else if(action.mode==='cheer'){
+      const duration=CHEER_DURATION,pose=cheerPose(elapsed);
+      local.group.userData.atdGesture=pose;
+      while(action.beats<CHEER_PEAKS.length&&elapsed>=CHEER_PEAKS[action.beats]){
+        const beat=action.beats++;
+        options.onOwnCheerBeat?.(action.call,beat,action.call?.direction);
+      }
+      if(elapsed>=duration){
+        currentAction=null;localSignal=null;local.group.userData.atdGesture=null;
+        options.onCheerEnd?.();
+      }
+    }else if(action.mode==='smoke'){
+      if(elapsed>=SMOKE_DURATION){currentAction=null;localSignal=null;}
+    }else if(action.mode==='eat'){
+      if(elapsed>=EAT_DURATION){currentAction=null;localSignal=null;}
+    }else if(['coffee','phone'].includes(action.mode)){
+      if(elapsed>2.8)currentAction=null;
+    }
+  }
+  function updateFigures(dt){
+    const moving=walkMix>.035;
+    local.group.position.set(player.x,player.y,player.z);
+    local.group.rotation.y=heading;
+    const bob=moving&&!seated?Math.sin(walkPhase*2)*.045:0;
+    local.group.position.y=player.y+bob+(seated?-.22:0);
+    if(local.shade){updateShadow(local);local.shade.visible=!seated;}
+    local.group.userData.atdWalk=walkMix;
+    local.group.userData.atdPhase=walkPhase;
+    if(currentAction?.mode==='smoke')paintBreath(local,(performance.now()-currentAction.smokeAt)/1000);
+    else if(currentAction?.mode==='eat')paintBreath(local,-1);
+    else if(local.vapor)local.vapor.visible=false;
+
+    for(const p of peers.values()){
+      const elapsed=Math.min(.35,Math.max(0,(performance.now()-(p.received||performance.now()))/1000));
+      const tx=p.tx+p.vx*elapsed*.22,tz=p.tz+p.vz*elapsed*.22;
+      const g=p.fig.group;
+      g.position.x=mix(g.position.x,tx,1-Math.exp(-dt*9));
+      g.position.z=mix(g.position.z,tz,1-Math.exp(-dt*9));
+      g.position.y=measuredGround(g.position.x,g.position.z);
+      g.rotation.y=turn(g.rotation.y,p.yaw,dt);
+      if(p.fig.shade)updateShadow(p.fig);
+      if(smokeMotion(p.motion)&&p.smokeAt!==undefined)paintBreath(p.fig,(performance.now()-p.smokeAt)/1000);
+      else if(p.fig.vapor)p.fig.vapor.visible=false;
+    }
+  }
+  function tick(stamp){
+    if(disposed)return;
+    frameHandle=requestAnimationFrame(tick);
+    const dt=lastFrame?clamp((stamp-lastFrame)/1000,0,.05):1/60;
+    lastFrame=stamp;time+=dt;frameCount++;
+    if(active){
+      let dx=0,dz=0;
+      const forward=(keys.has('w')||keys.has('arrowup')?1:0)-(keys.has('s')||keys.has('arrowdown')?1:0);
+      const side=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0);
+      if((forward||side)&&!gestureLocked()&&!aligning&&!seated){
+        cancelPlan();openingVista=false;railView=null;
+        const fx=-Math.sin(cameraYaw),fz=-Math.cos(cameraYaw),rx=Math.cos(cameraYaw),rz=-Math.sin(cameraYaw);
+        dx=fx*forward+rx*side;dz=fz*forward+rz*side;
+        const len=Math.hypot(dx,dz)||1;dx/=len;dz/=len;
+        const speed=currentAction?.mode==='push'||currentAction?.mode==='pull'?1.15:WALK_SPEED;
+        const moved=moveWithCollision(dx*speed*dt,dz*speed*dt);
+        if(moved>.001){heading=turn(heading,Math.atan2(dx,dz),dt);lastMove=time;walkPhase+=moved*GAIT_PER_UNIT;}
+      }
+      let movedAuto=0;
+      if(plan&&!gestureLocked()&&!seated){
+        const speed=plan.quick?TRAVEL_SPEED:WALK_SPEED;
+        movedAuto=walk(speed*dt,dt);
+        if(movedAuto>.001){lastMove=time;walkPhase+=movedAuto*GAIT_PER_UNIT;}
+      }
+      const moving=dx!==0||dz!==0||movedAuto>.001;
+      walkMix=ease(walkMix,moving?1:0,dt*9);
+      if(moving){openingVista=false;if(railView==='shark')railView=null;}
+      if(seated&&lastSeat){player.set(seatX(lastSeat),measuredGround(lastSeat.x,lastSeat.z),seatZ(lastSeat));}
+      updateAction(dt);
+      if(currentAction?.mode==='cheer'){
+        const elapsed=time-currentAction.start;
+        const pose=cheerPose(elapsed);
+        guardianFigures.forEach(fig=>{fig.group.userData.atdCheer=pose;});
+      }
+      ambient(dt);
+      harborLife.update?.(time);
+      office.update?.(time);
+      marquee.update?.(time);
+      if(time-markerTimer>2.1)groundMarker.visible=false;
+      if(time-ceremony>4.8)feedback.hidden=true;
+      updateRope(currentAction?.mode==='pull'?1:currentAction?.mode==='push'?shipPush:0);
+      updateFigures(dt);
+      refreshNearby();
+      adjustView(dt);
+      placeLabels();
+      paintMarks();
+      cheers.update?.(stamp/1000);
+      court.update?.(time);
+      set.update?.(time);
+      if(frameCount%3===0)options.onFrame?.({time,player:{x:player.x,z:player.z},nearby:near});
+    }
+    renderer.render(scene,camera);
+  }
+  function setActive(value){
+    active=Boolean(value);
+    if(!active){cancelPlan();keys.clear();pointerDown=null;}
+    if(active)resize();
+  }
+  function getZonePosition(id){
+    const z=zones[id];return z?{x:z.x,z:z.z,y:z.y||0}:null;
+  }
+  function setBoard(value){marquee.setBoard?.(value);set.setBoard?.(value);}
+  function setDepartures(value,terminal){office.setDepartures?.(value,terminal);set.setDepartures?.(value,terminal);}
+  let wishState={selected:null,wishes:[]};
+  function setWishes(selected,wishes=[]){wishState={selected,wishes:Array.isArray(wishes)?wishes:[]};set.setWishes?.(selected,wishState.wishes);}
+  function goToWish(id){
+    const index=wishState.wishes.findIndex(w=>w.id===id);
+    const wish=index>=0?wishState.wishes[index]:null;
+    const side=id==='right'?1:id==='left'?-1:(index%2?1:-1);
+    const target=wish&&Number.isFinite(Number(wish.x))&&Number.isFinite(Number(wish.z))
+      ?{x:Number(wish.x),z:Number(wish.z)}
+      :{x:zones.shrine.x+side*1.8,z:zones.shrine.z+1.4};
+    return autopilot(target,null,false,true,true);
+  }
+  function interactNearShrine(){return false;}
+  function replayDeparture(){return office.replay?.()||false;}
+  function setProfile(value){
+    profile=value||{};const next=profile.style==='vest'?'vest':'cardigan';
+    if(next===style)return;
+    removeFigure(local);style=next;local=addFigure(style);local.group.position.copy(player);local.group.rotation.y=heading;updateShadow(local);
+  }
+  function dispose(){
+    if(disposed)return;
+    disposed=true;cancelAnimationFrame(frameHandle);cancelPlan();observer.disconnect();
+    canvas.removeEventListener('pointerdown',pointerStart);
+    canvas.removeEventListener('pointermove',pointerMove);
+    canvas.removeEventListener('pointerup',pointerEnd);
+    canvas.removeEventListener('pointercancel',pointerEnd);
+    canvas.removeEventListener('wheel',wheel);
+    canvas.removeEventListener('contextmenu',context);
+    canvas.removeEventListener('keydown',keyDown);canvas.removeEventListener('keyup',keyUp);
+    window.removeEventListener('keydown',keyDown);window.removeEventListener('keyup',keyUp);window.removeEventListener('blur',blur);
+    for(const [id,p] of peers)removePeer(id,p);
+    removeFigure(local);for(const fig of guardianFigures)removeFigure(fig);
+    for(const mark of palmMarks)mark.wrapper.remove();
+    for(const effect of effects){scene.remove(effect.mesh);effect.mesh.material?.dispose();}
+    cheers.dispose?.();office.dispose?.();marquee.destroy?.();harborLife.destroy?.();set.dispose?.();
+    smokeTex.dispose();shadeTex.dispose();shadeGeo.dispose();shadeMat.dispose();splashGeo.dispose();splashMat.dispose();
+    ringGeo.dispose();littleRing.material.dispose();waveMat.dispose();faceMat.dispose();ropeGeometry.dispose();rope.material.dispose();
+    ropeUnitGeo.dispose();ropeMat.dispose();pullLabel.texture.dispose();
+    for(const p of confetti){scene.remove(p.m);p.m.geometry.dispose();p.m.material.dispose();}
+    renderer.dispose?.();host.remove();container.replaceChildren();
+  }
+  refreshNearby(true);
+  adjustView(1/60);
+  frameHandle=requestAnimationFrame(tick);
+  return {
+    available:true,
+    sayChat,
+    setActive,
+    goTo,
+    watchShark,
+    eatFishcake,
+    replayDeparture,
+    smoke,
+    interactNearShrine,
+    toggleSeat,
+    getPresence,
+    setBoard,
+    setDepartures,
+    setWishes,
+    setProfile,
+    setWeather,
+    setLight,
+    bindVessels,
+    setVessel,
+    setNeighbors,
+    celebrate,
+    canCheerHere,
+    approachGuardian,
+    cheer,
+    goToWish,
+    setLivePeers,
+    getZonePosition,
+    actAtDock,
+    visitFoodStall,
+    goToPeer,
+    getSeatState,
+    dispose
+  };
+}
