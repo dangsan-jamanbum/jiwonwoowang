@@ -134,7 +134,8 @@ async function ensureWorld(){
   world=m.mountWalk3D($('#world'),{
     profile:state.profile||{name:'나',style:'cardigan'},active:true,onHint:toast,
     cargoItems:cargoState.items||[],cargoSelfId:cargoState.selfId,
-    onFishCaught:()=>{api('fishing',{mode:'catch'}).catch(()=>{});},
+    onFishCooked:()=>{api('fishing',{mode:'cooked'}).catch(()=>{});},
+     onFishEaten:()=>{api('fishing',{mode:'eaten'}).catch(()=>{});},
     onCargoAction:async(mode,itemId,position)=>{
       const call=state.selected;
       if(!call)throw new Error('먼저 운반할 모선을 선택해 주세요.');
