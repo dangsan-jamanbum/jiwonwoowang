@@ -14,36 +14,52 @@ const delayCargoTypes = [
   ['weather','태풍·강풍 경보'],['weather','낙뢰·폭우 경보'],['weather','짙은 해무'],['weather','풍랑 주의보'],
   ['weather','저시정 안개'],['weather','폭우 침수 위험'],['weather','강풍으로 인한 작업 중단'],['weather','기상 악화 경보'],
   ['equipment','안벽 크레인 고장'],['equipment','하역 장비 정지'],['equipment','야드 트랙터 고장'],
-  ['equipment','전력 공급 장애'],['equipment','컨테이너 고정 장치 파손'],['equipment','선적 설비 점검'],['equipment','항만 장비 긴급 수리']
+  ['equipment','전력 공급 장애'],['equipment','컨테이너 고정 장치 파손'],['equipment','선적 설비 점검'],['equipment','항만 장비 긴급 수리'],
+  ['bomb','모선 결함']
 ];
 const cancelCargoTypes = [
   ['crew','긴급 작업 인원 파견'],['crew','추가 하역 인력 투입'],['crew','야간 작업조 지원'],['crew','안전 관리 인력 증원'],
   ['crew','정비 기술자 파견'],['crew','유도 작업자 지원'],['crew','긴급 복구 인력 투입'],['crew','선적 지원 인력 증원'],
   ['equipment','예비 크레인 투입'],['equipment','하역 장비 긴급 지원'],['equipment','전력 복구 장비'],['equipment','컨테이너 고정 장비'],
-  ['equipment','야드 장비 추가 배치'],['equipment','긴급 수리 공구 세트'],['equipment','선적 보조 설비 지원']
+  ['equipment','야드 장비 추가 배치'],['equipment','긴급 수리 공구 세트'],['equipment','선적 보조 설비 지원'],
+  ['wrench','모선 결함 상쇄']
 ];
-function makeCargoSpawnPoints(count){
+function makeCargoSpawnPoints(count,starterCount=48){
   let seed=0x5a17c9;
   const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
   const points=[];
-  for(let attempt=0;attempt<60000&&points.length<count;attempt++){
+  const valid=(x,z,minGap)=>{
+    if(!onHarborLand(x,z))return false;
+    if(CY_STACK_BOUNDS.some(b=>x>=b.minX-1.05&&x<=b.maxX+1.05&&z>=b.minZ-1.05&&z<=b.maxZ+1.05))return false;
+    if(Math.hypot(x+16.15,z-24.7)<4.6||Math.hypot(x+18.42,z-28.15)<2.8)return false;
+    if(Math.hypot(x+5.15,z+36.4)<4.0)return false;
+    return !points.some(p=>Math.hypot(x-p.x,z-p.z)<minGap);
+  };
+  // Put a visible mix of cargo types around the actual player spawn (6, 8).
+  for(let attempt=0;attempt<120000&&points.length<Math.min(count,starterCount);attempt++){
+    const angle=random()*Math.PI*2,radius=2.4+Math.sqrt(random())*12.5;
+    const x=6+Math.cos(angle)*radius,z=8+Math.sin(angle)*radius;
+    if(!valid(x,z,1.55))continue;
+    points.push({x,z,yaw:random()*Math.PI*2});
+  }
+  for(let attempt=0;attempt<240000&&points.length<count;attempt++){
     const x=-42+random()*73,z=-108.4+random()*163.6;
-    if(!onHarborLand(x,z))continue;
-    if(CY_STACK_BOUNDS.some(b=>x>=b.minX-1.25&&x<=b.maxX+1.25&&z>=b.minZ-1.25&&z<=b.maxZ+1.25))continue;
-    if(Math.hypot(x+16.15,z-24.7)<4.6||Math.hypot(x+18.42,z-28.15)<2.8)continue;
-    if(Math.hypot(x+5.15,z+36.4)<4.0)continue;
-    if(points.some(p=>Math.hypot(x-p.x,z-p.z)<3.15))continue;
+    if(!valid(x,z,1.55))continue;
     points.push({x,z,yaw:random()*Math.PI*2});
   }
   if(points.length!==count)throw new Error('화물 배치 위치를 충분히 찾지 못했습니다: '+points.length+'/'+count);
   return points;
 }
-const cargoSpawns=makeCargoSpawnPoints(30);
-const cargoItems=[...delayCargoTypes.map(([kind,name],i)=>({effect:'delay',kind,name})),
-  ...cancelCargoTypes.map(([kind,name],i)=>({effect:'cancel',kind,name}))].map((item,i)=>({
-    id:'cargo-pnc-'+String(i+1).padStart(3,'0'),...item,
-    ...cargoSpawns[i],carrierId:null,delivered:false
-  }));
+const cargoBlueprints=[];
+for(let copy=0;copy<15;copy++){
+  for(const [kind,name] of delayCargoTypes)cargoBlueprints.push({effect:'delay',kind,name,copy:copy+1});
+  for(const [kind,name] of cancelCargoTypes)cargoBlueprints.push({effect:'cancel',kind,name,copy:copy+1});
+}
+const cargoSpawns=makeCargoSpawnPoints(cargoBlueprints.length,48);
+const cargoItems=cargoBlueprints.map((item,i)=>({
+  id:'cargo-pnc-'+String(i+1).padStart(4,'0'),...item,
+  ...cargoSpawns[i],carrierId:null,delivered:false
+}));
 const delayByCall = new Map();
 const cargoEvents = [];
 let sashimiPlateFull=false;
