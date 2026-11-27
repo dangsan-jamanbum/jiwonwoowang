@@ -167,7 +167,7 @@ async function getPncSchedule(force=false){
         kind:pncCache.calls.length?'official':'unavailable',
         label:pncCache.calls.length?'공식 자료 갱신 지연 · 마지막 수신 자료':'PNC 공식 자료 연결 실패',
         checkedAt,updatedAt:pncCache.source?.updatedAt||null,
-        stale:true,partial:false,error:'공식 PNC 자료를 새로 가져오지 못했습니다.'
+        stale:true,partial:false,error:String(error.message||error).slice(0,240)
       }};
     }
     updateCalls();
