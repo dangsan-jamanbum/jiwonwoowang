@@ -117,7 +117,8 @@ export function mountTerminalMarquee(T,scene,renderer){
     ctx.fillStyle='#274650';ctx.fillRect(20,455,W-40,2);
     const trucks=board.trucks;
     const truckLabel=trucks && Number.isFinite(trucks.inbound)&&Number.isFinite(trucks.outbound)?'  ·  반입 '+trucks.inbound+'대 / 반출 '+trucks.outbound+'대':'';
-    const recent=board.delayEvents?.[0],recentLabel=recent?'  ·  최근 '+recent.itemName+' '+(recent.deltaDays>0?'+':'')+recent.deltaDays+'일':'';\n    words((board.source?board.terminal.toUpperCase()+' 운영사 공개자료':'부산항')+truckLabel+recentLabel,46,507,24,'#bed1cf',520,805);
+    const recent=board.delayEvents?.[0],recentLabel=recent?'  ·  최근 '+recent.itemName+' '+(recent.deltaDays>0?'+':'')+recent.deltaDays+'일':'';
+    words((board.source?board.terminal.toUpperCase()+' 운영사 공개자료':'부산항')+truckLabel+recentLabel,46,507,24,'#bed1cf',520,805);
     ctx.textAlign='right';words((board.last==='—'?'':'확인 '+board.last+' KST   ')+(board.rows.length>3?(page+1)+'/'+Math.ceil(board.rows.length/3):''),W-43,507,25,'#b6c9c8',550,540);ctx.textAlign='left';
     tex.needsUpdate=true;
   }
