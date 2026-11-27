@@ -27,9 +27,9 @@ export function loadingState(call){
 export function boardData(state={}){
   const terminal=state.terminal||'pnc', status=state.terminalStatus||{},source=status.source||{};
   const official=source.kind==='official',live=official&&!source.stale;
-  const statusText=source.partial?'확인본 · 일부 모선':source.stale?'최근 확인본':live?'운영사 공식':'연결 대기';
+  const statusText=source.kind==='demo'?'실시간 연결 대기 · 예시 자료':source.partial?'확인본 · 일부 모선':source.stale?'최근 확인본':live?'운영사 공식':'연결 대기';
   const priority=c=>c.berthPhase==='berthed'?0:c.berthPhase==='departed'?2:1;
-  const rows=(official?(status.calls||[]):[]).filter(c=>c && c.terminal===terminal && !c.isDemo &&
+  const rows=(status.calls||[]).filter(c=>c && c.terminal===terminal && (official?!c.isDemo:true) &&
     (c.berthPhase!=='departed'||c.loading?.workCheckedAt))
     .sort((a,b)=>priority(a)-priority(b)||String(a.etb||'~').localeCompare(String(b.etb||'~')));
   return {terminal,source:source.label||'',last:timeLabel(source.checkedAt||source.updatedAt),statusText,live,
@@ -103,7 +103,7 @@ export function mountTerminalMarquee(T,scene,renderer){
       words(quantity(w.remainingVan),X[3],y+53,35,'#edf5ef',650,170);
       words(loadingState(row),X[4],y+53,29,'#f2d598',620,210);
     }
-    if(!board.rows.length)words(board.statusText==='연결 대기'?'공식 선적 자료 연결 대기':'표시할 선적 자료가 없습니다',X[0],240,36,'#c6d5d5');
+    if(!board.rows.length)words(board.statusText.includes('연결 대기')?'공식 선적 자료 연결 대기':'표시할 선적 자료가 없습니다',X[0],240,36,'#c6d5d5');
     ctx.fillStyle='#274650';ctx.fillRect(20,455,W-40,2);
     const trucks=board.trucks;
     const truckLabel=trucks && Number.isFinite(trucks.inbound)&&Number.isFinite(trucks.outbound)?'  ·  반입 '+trucks.inbound+'대 / 반출 '+trucks.outbound+'대':'';
