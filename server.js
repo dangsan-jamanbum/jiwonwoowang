@@ -46,6 +46,7 @@ const cargoItems=[...delayCargoTypes.map(([kind,name],i)=>({effect:'delay',kind,
   }));
 const delayByCall = new Map();
 const cargoEvents = [];
+let sashimiPlateFull=false;
 let calls = [
   { id:'demo-pnc-001', terminal:'pnc', name:'ATD 부산항 연습선', voy:'DEMO-001', outboundVoy:'DEMO-001', inboundVoy:'DEMO-001', carrierVoy:'DEMO-001', berth:'연습 부두', berthPhase:'alongside', etd:null, etb:null, atd:null, atdVerified:false, isDemo:true },
   { id:'demo-pnit-001', terminal:'pnit', name:'ATD 북항 연습선', voy:'DEMO-002', outboundVoy:'DEMO-002', inboundVoy:'DEMO-002', carrierVoy:'DEMO-002', berth:'연습 부두', berthPhase:'alongside', etd:null, etb:null, atd:null, atdVerified:false, isDemo:true }
@@ -418,6 +419,10 @@ const server=http.createServer(async(req,res)=>{
         if(body.mode==='pull')session.pulls++;
         return json(res,200,{ok:true});
       }
+      if(route==='fishing'){
+        if(body.mode==='catch')sashimiPlateFull=true;
+        return json(res,200,{ok:true,sashimiPlateFull});
+      }
       if(route==='cargo'){
         const item=cargoItems.find(v=>v.id===body.itemId&&!v.delivered);
         if(!item)return json(res,404,{error:'화물을 찾을 수 없습니다.'});
@@ -462,6 +467,7 @@ const server=http.createServer(async(req,res)=>{
         const peers=[...presence.values()].filter(p=>p.terminal===body.terminal&&p.callId===body.callId);
         return json(res,200,{selfId,selfName:entry.name,serverTime:Date.now(),online:peers.length,
           cargoItems:cargoItems.filter(v=>!v.delivered),
+          sashimiPlateFull,
           peers:peers.filter(p=>p.selfId!==selfId).map(p=>({id:p.selfId,avatarId:p.selfId,name:p.name,style:p.style,x:p.x||0,y:p.y||0,z:p.z||0,yaw:p.yaw||0,motion:p.motion||'idle',cargoId:p.cargoId||null,actionId:p.actionId||null,updatedAt:p.seenAt}))});
       }
     }
