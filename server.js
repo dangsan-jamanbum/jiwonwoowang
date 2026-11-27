@@ -62,18 +62,21 @@ for(const [index,[kind,name]] of cancelCargoTypes.entries()){
   const copies=index%2===0?4:3;
   for(let copy=0;copy<copies;copy++)cargoBlueprints.push({effect:'cancel',kind,name,copy:copy+1});
 }
-// Mix all item types before assigning map positions so identical items never spawn in batches.
-let cargoMixSeed=0x31d7a9;
-const cargoMixRandom=()=>{cargoMixSeed=(cargoMixSeed*1664525+1013904223)>>>0;return cargoMixSeed/4294967296;};
-for(let i=cargoBlueprints.length-1;i>0;i--){
-  const j=Math.floor(cargoMixRandom()*(i+1));
-  [cargoBlueprints[i],cargoBlueprints[j]]=[cargoBlueprints[j],cargoBlueprints[i]];
+// Effects are authoritative: delay = red penalty; cancel = green positive support.
+let cargoRound=1;
+function makeCargoRound(round){
+  const shuffled=cargoBlueprints.map(item=>({...item}));
+  for(let i=shuffled.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]];
+  }
+  const spawns=makeCargoSpawnPoints(shuffled.length);
+  return shuffled.map((item,i)=>({
+    id:'cargo-pnc-r'+round+'-'+String(i+1).padStart(4,'0'),...item,
+    ...spawns[i],carrierId:null,delivered:false
+  }));
 }
-const cargoSpawns=makeCargoSpawnPoints(cargoBlueprints.length);
-const cargoItems=cargoBlueprints.map((item,i)=>({
-  id:'cargo-pnc-'+String(i+1).padStart(4,'0'),...item,
-  ...cargoSpawns[i],carrierId:null,delivered:false
-}));
+let cargoItems=makeCargoRound(cargoRound);
 const delayByCall = new Map();
 const cargoEvents = [];
 let sashimiPlateFull=false,sharkEaten=false,sharkCaught=false;
@@ -480,8 +483,13 @@ const server=http.createServer(async(req,res)=>{
           const event={id:randomUUID(),callId,itemId:item.id,itemName:item.name,actor:profileFor(session).name,
             mode:'delivery',delivered,deltaDays,totalDays:total,createdAt:new Date().toISOString()};
           cargoEvents.push(event);if(cargoEvents.length>300)cargoEvents.shift();
+          // Keep every spawn fixed for the whole round. Only when every item is delivered
+          // (no floor items and no item still being carried) create the next random round.
+          if(cargoItems.length&&cargoItems.every(v=>v.delivered)){
+            cargoRound++;cargoItems=makeCargoRound(cargoRound);
+          }
         }else return json(res,400,{error:'지원하지 않는 화물 작업입니다.'});
-        return json(res,200,{selfId:session.id,items:cargoItems.filter(v=>!v.delivered),delayDays:delayByCall.get(callId)||0,
+        return json(res,200,{selfId:session.id,round:cargoRound,items:cargoItems.filter(v=>!v.delivered),delayDays:delayByCall.get(callId)||0,
           events:cargoEvents.filter(e=>e.callId===callId).slice(-8).reverse(),
           message:body.mode==='pickup'?'화물을 들었습니다. 출항 부두의 지정 구역에 옮겨 놓으세요.':
             item.delivered?(item.effect==='cancel'?'상쇄 지원 완료! 출항 지연이 1일 줄었습니다.':'지연 요인 도착! 출항 지연이 1일 늘었습니다.'):
