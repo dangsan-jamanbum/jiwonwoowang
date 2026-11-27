@@ -1,0 +1,116 @@
+@font-face{font-family:AtdPret;src:url('/assets/pretendard.woff2') format('woff2');font-weight:100 900;font-display:swap}
+:root{--ink:#1e3540;--paper:#fff9e9;--glass:#192d3be0;--edge:#fff5d44a;font-family:AtdPret,"Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+html,body,#game-shell{width:100%;height:100%;margin:0}body{background:#16273a;overflow:hidden}
+#harbor-app{position:relative;width:100%;height:100vh;height:100dvh;min-height:230px;isolation:isolate;overflow:hidden;color:var(--paper);user-select:none}
+#harbor-app [hidden]{display:none!important}
+#world,#walk-hud,.hud-shade,#loading{position:absolute;inset:0}
+#world{z-index:0;background:#2c4861}.hud-shade{pointer-events:none;z-index:1;background:linear-gradient(180deg,#10243338,transparent 19%,transparent 84%,#10233338)}
+#loading{display:grid;place-content:center;justify-items:center;gap:12px;padding:24px;box-sizing:border-box;background:#263d51;color:#fff3da;text-align:center;font-size:15px}
+#loading h1{margin:0;font-size:clamp(64px,13vw,104px);line-height:1;font-weight:800;letter-spacing:.08em;text-indent:.08em}
+#loading .game-tagline{margin:0;font-size:clamp(17px,3.8vw,22px);line-height:1.5;font-weight:550;letter-spacing:-.025em}
+#loading-status{margin-top:20px;color:#c3d1d6;font-size:13px}
+#retry-world{border:1px solid var(--edge);border-radius:9px;padding:6px 12px;background:#203448;color:#fff7e5}
+#walk-hud{z-index:3;pointer-events:none}#walk-hud button,#dialogue-host>*{pointer-events:auto}
+.place-strip,.tools,.voyage-hud,.walk-bottom,.context-action,#scene-caption{position:absolute}
+.place-strip{left:clamp(16px,2vw,36px);top:max(17px,env(safe-area-inset-top));display:flex;align-items:center;gap:11px;text-shadow:0 1px 5px #17242b,0 1px 12px #192f3a}
+.place-strip strong{color:#fff8e9;font-size:clamp(16px,1.6vw,22px);line-height:1.2;font-weight:740;letter-spacing:-.025em}
+#guide-map,.tools button,.quay-more,.voyage-hud{border:1px solid var(--edge);background:var(--glass);color:#fff8eb;box-shadow:0 2px 7px #1525332e}
+#guide-map,.tools button{width:37px;height:37px;display:grid;place-items:center;border-radius:50%;padding:0}#guide-map{width:43px;height:43px;color:#f7dda0}#guide-map i{font-size:20px}
+.tools{right:clamp(14px,2vw,36px);top:max(16px,env(safe-area-inset-top));display:flex;align-items:center;gap:7px}.tools .my-id img{width:28px;height:28px;object-fit:cover;border-radius:50%}
+.clock{font-size:13px;font-weight:650;font-variant-numeric:tabular-nums;margin-right:4px;text-shadow:0 1px 6px #152432}.clock small{font-size:10px}
+.voyage-hud{right:clamp(14px,2vw,36px);top:66px;max-width:48vw;display:flex;align-items:center;gap:8px;text-align:right;padding:7px 12px;border-radius:11px}
+.voyage-hud b,.voyage-hud small{display:block}.voyage-hud b{font-size:13px;letter-spacing:.02em}.voyage-hud small{font-size:11px;color:#d9e1df}.voyage-hud i{color:#e5cd99}
+.walk-bottom{left:clamp(16px,2vw,36px);bottom:max(17px,env(safe-area-inset-bottom));display:flex;align-items:center;gap:11px}
+.quay-more{padding:6px 11px;border-radius:20px;font-size:13px;display:inline-flex;align-items:center;gap:6px}
+.key-legend{font-size:13px;color:white;font-weight:600;text-shadow:0 1px 5px #162332,0 1px 8px #243b48}
+.key-legend kbd,.walk-start kbd{font:650 11px/1.4 AtdPret,sans-serif;border:1px solid currentColor;border-radius:5px;padding:1px 4px;margin-right:4px}
+.context-action{left:50%;bottom:clamp(18px,4.5vh,45px);transform:translateX(-50%);display:grid;justify-items:center;gap:5px;white-space:nowrap}.context-action.off{display:none}
+.context-action p:not(:empty){font-size:13px;padding:3px 10px;border-radius:20px;background:#172d3bd6;color:white}
+.walk-start{display:inline-flex;align-items:center;gap:5px;border-radius:22px;padding:10px 19px;background:#fff0c9;color:var(--ink);border:1px solid #fff7e4;box-shadow:0 3px 10px #1828374d;font-weight:750;font-size:16px;letter-spacing:-.025em}
+.quay-more{font-size:12px;padding:3px 10px}
+#scene-caption{bottom:26%;left:50%;transform:translateX(-50%);color:#ffedbd;text-shadow:0 2px 6px #143347;font-weight:850;font-size:27px;white-space:nowrap}
+#toast{background:#fff0ce;color:var(--ink);border:1px solid #f5ddb4;box-shadow:0 4px 16px #12233545;bottom:18%}
+dialog{font-family:AtdPret,sans-serif}button:focus-visible{outline-color:#ffc47d}
+.atlas{display:grid;gap:14px;padding:12px 20px 21px}.atlas-image{position:relative;aspect-ratio:2/1;border-radius:12px;background:#abc8c5 url('/assets/walk-map.svg?v=16') center/100% 100% no-repeat}
+.atlas-pin{position:absolute;transform:translate(-50%,-50%);display:grid;place-items:center;border:2px solid #fae9b8;border-radius:50%;background:#214a55;color:#fff2c9;width:29px;height:29px;box-shadow:0 2px 5px #18394a99}.atlas-pin:hover{background:#436c71}
+.atlas-list{display:grid;grid-template-columns:1fr 1fr;gap:7px}.atlas-list button,.record-list button{border:1px solid #d7dfd6;border-radius:10px;text-align:left;padding:9px 12px;background:#f0f3ec;color:var(--ink);font-weight:700;display:flex;align-items:center;gap:8px}.atlas-list small{color:#587267;font-size:12px;margin-left:auto;font-weight:400}
+.record-list{display:flex;flex-wrap:wrap;gap:6px}.record-list button{font-size:12px}
+@media(pointer:coarse){.key-legend{display:none}.walk-bottom{bottom:auto;top:78px}}
+@media(max-width:700px){.place-strip{gap:7px;left:11px}.place-strip strong{font-size:17px}#guide-map{width:35px;height:35px}.tools{gap:5px;right:11px}.tools button{width:30px;height:30px}.tools .my-id img{width:23px;height:23px}.clock{display:none}.voyage-hud{top:56px;right:10px;gap:5px;padding:5px 8px}.voyage-hud b{font-size:11px}.voyage-hud small{font-size:10px}.voyage-hud i{font-size:12px}.walk-bottom{left:11px}.context-action{left:auto;right:12px;bottom:32px;transform:none}.key-legend{display:none}.walk-start{padding:9px 15px}.context-action kbd{display:none}.atlas-list small{display:none}}
+@media(max-height:500px){.place-strip,.tools{top:8px}.voyage-hud{top:47px}.walk-bottom{bottom:9px}.context-action{bottom:12px}}
+@media(pointer:coarse){.walk-bottom{top:104px}}
+
+/* Dark enamel plaques remain readable against water and the night sky. */
+
+
+.tools .my-id {
+  overflow: hidden;
+  border-color: #d7e3da;
+  background: linear-gradient(145deg,#d2dfd3,#95aba1);
+}
+.tools .my-id img { display:block; width:100%; height:100%; object-fit:contain; }
+#panel.profile-dialog {
+  --crew-gap: 16px;
+  position:fixed;
+  inset: max(62px,calc(env(safe-area-inset-top) + 54px)) max(12px,2vw) auto auto;
+  margin:0;
+  width:min(338px,calc(100vw - 24px));
+  max-height:calc(100dvh - 80px);
+  border:1px solid #b3c6bb;
+  border-radius:15px;
+  background:#f9fbf5;
+  box-shadow:0 8px 36px #132d353d;
+}
+#panel.profile-dialog::backdrop { background:transparent; backdrop-filter:none; }
+.profile-dialog .panel-head { background:#f9fbf5; border:0; padding:13px var(--crew-gap) 5px; }
+.profile-dialog .panel-head h2 { font-size:1.2rem; }
+.profile-dialog .round-control { width:30px; height:30px; }
+.crew-form { display:grid; gap:14px; padding:8px var(--crew-gap) var(--crew-gap); }
+.crew-people { min-width:0; margin:0; padding:0; border:0; }
+.crew-people legend,.crew-form .field { color:#304a45; font-size:.88rem; font-weight:650; }
+.crew-people legend { padding:0; margin:0 0 7px; }
+.crew-pair { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.crew-card { --portrait-color:#d4e1ce; position:relative; display:grid; grid-template-rows:103px auto; background:#fffefa; border:1px solid #c7d1c8; border-radius:10px; overflow:hidden; cursor:pointer; }
+.crew-card[data-style="vest"] { --portrait-color:#d8e0e4; }
+.crew-card:has(:checked) { border-color:#3c6a60; box-shadow:0 0 0 1px #3c6a60; }
+.crew-card:has(:focus-visible) { outline:3px solid #537b99; outline-offset:3px; }
+.crew-card input { appearance:none; position:absolute; z-index:1; right:8px; top:8px; width:16px; height:16px; margin:0; border:1px solid #849b91; border-radius:50%; background:#fffefa; cursor:pointer; }
+.crew-card input:checked { border:4px solid #f9f9ed; background:#37675b; box-shadow:0 0 0 1px #416b60; }
+.crew-sleeve { display:flex; justify-content:center; align-items:flex-end; overflow:hidden; background:radial-gradient(ellipse at 44% 16%,#f4f4e6,var(--portrait-color) 78%); }
+.crew-sleeve img { height:96%; width:100%; object-fit:contain; object-position:center bottom; display:block; }
+.crew-caption { display:grid; gap:2px; padding:8px 10px 10px; color:#243d38; }
+.crew-caption strong { font-size:1.04rem; line-height:1.15; font-weight:750; }
+.crew-caption small { color:#516760; font-size:.77rem; }
+.crew-form .field input { background:#fffefa; }
+.crew-save { min-height:40px; border-radius:8px; color:#fffefa; background:#2f574d; font-weight:650; }
+.crew-save:hover { background:#284b42; }
+@media(max-height:500px) {
+  #panel.profile-dialog { top:8px; max-height:calc(100dvh - 16px); overflow:auto; }
+  .crew-card { grid-template-rows:68px auto; }
+  .crew-form { gap:9px; }
+}
+
+.terminal-detail{background:#142e38;color:#f4f2e3;padding:1.15rem 1.35rem 1.2rem}
+.terminal-boardbar{display:flex;justify-content:space-between;gap:1rem;align-items:center}
+.terminal-boardbar strong{font-size:1.13rem;color:#ffca83;white-space:nowrap}
+.terminal-boardbar select{color:#f3f1df;background:#264654;border:1px solid #5d7881;padding:.45rem .65rem;border-radius:4px;max-width:69%}
+.terminal-meta{color:#b6c9cd;font-size:.85rem;line-height:1.6;margin:.65rem 0}
+.terminal-meta a{color:#cbe4e1;text-decoration:underline;text-underline-offset:.2em}
+.terminal-roster{overflow:auto;max-height:min(58vh,32rem);border-block:1px solid #43606a}
+.terminal-roster table{border-collapse:collapse;width:100%;text-align:left;font-variant-numeric:tabular-nums}
+.terminal-roster th,.terminal-roster td{padding:.62rem .45rem;white-space:nowrap;border-bottom:1px solid #324e58;font-size:.89rem}
+.terminal-roster th{background:#21414d;position:sticky;top:0;color:#c1d1d3}
+.terminal-roster small{display:block;color:#c0d0c7;margin-top:.13rem}
+.terminal-roster td:first-child{color:#f9d5a0}
+
+.context-buttons,.shrine-shortcuts{display:flex;align-items:center;justify-content:center;gap:8px}
+
+.shrine-alternate{background:#dcebed;color:#25484c;border-color:#eaf2f3}.shrine-shortcuts .quay-more{padding:7px 12px;font-size:13px}.context-buttons button:disabled{opacity:.6;cursor:wait}
+
+#interact[data-icon-only="true"]{width:45px;height:45px;min-width:0;min-height:0;padding:0;justify-content:center;border-radius:50%}
+#smoke-icon,#eomuk-icon{display:grid;place-items:center}
+.profile-guide{margin:0 var(--crew-gap) var(--crew-gap);border-top:1px solid #c8d1c4;color:#374c49;font-size:.91rem}
+.profile-guide summary{display:flex;gap:.55rem;align-items:center;padding:.72rem 0 .32rem;cursor:pointer;min-height:2.5rem;font-weight:650}
+.profile-guide summary::after{content:'⌄';margin-left:auto;font-size:1.05rem}.profile-guide[open] summary::after{transform:rotate(180deg)}
+.profile-guide summary::marker{content:''}.profile-guide summary::-webkit-details-marker{display:none}
+.profile-guide .howto{padding:.6rem 0 .1rem;gap:.7rem;line-height:1.55}.profile-guide .howto p{margin:0}.profile-guide .howto button{justify-self:start}

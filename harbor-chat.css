@@ -1,0 +1,29 @@
+#harbor-app {
+  --chat-inset:max(12px,env(safe-area-inset-bottom));
+  --chat-footprint:66px;
+}
+.harbor-chat {
+  box-sizing:border-box; position:absolute; z-index:4;
+  left:max(16px,env(safe-area-inset-left)); bottom:calc(var(--chat-inset) + var(--chat-keyboard-gap,0px));
+  width:min(354px,calc(100% - 32px)); pointer-events:auto; user-select:text;
+  padding:5px; color:#fff9ec; background:#192e3bea;
+  border:1px solid #dee8db57; border-radius:13px; box-shadow:0 3px 14px #0e253640;
+  font-size:14px;
+}
+.harbor-chat form { display:flex; align-items:center; gap:5px }
+.harbor-chat form input { flex:1; min-width:0; box-sizing:border-box; height:44px; padding:0 12px; color:#193a41; background:#fbfcf5; border:1px solid #d9e3d7; border-radius:8px; font:inherit; font-size:16px }
+.harbor-chat form input::placeholder { color:#526765; opacity:1 }
+.harbor-chat form input:focus-visible { outline:2px solid #aed4b9; outline-offset:1px }
+.harbor-chat form button { min-width:48px; height:44px; padding:0 11px; background:#bdddc7; color:#163a37; border:0; border-radius:8px; font:inherit; font-weight:700; cursor:pointer }
+.harbor-chat form button:disabled { opacity:.65 }
+.harbor-chat [role=status] { margin:4px 6px 1px; color:#fed8b0; font-size:12px }
+.harbor-chat [role=status]:empty { display:none }
+#walk-hud .walk-bottom { bottom:calc(var(--chat-inset) + var(--chat-footprint)) }
+@media(max-width:920px) {
+  #walk-hud .context-action { bottom:calc(var(--chat-inset) + var(--chat-footprint)) }
+}
+@media(max-width:650px),(pointer:coarse) {
+  #harbor-app { --chat-inset:max(7px,env(safe-area-inset-bottom)) }
+  #walk-hud .walk-bottom { top:max(104px,calc(env(safe-area-inset-top) + 84px)); bottom:auto }
+  .harbor-chat { left:max(10px,env(safe-area-inset-left)); width:min(354px,calc(100% - max(10px,env(safe-area-inset-left)) - max(10px,env(safe-area-inset-right)))) }
+}
