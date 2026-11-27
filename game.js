@@ -128,9 +128,21 @@ function renderHud(){
 async function ensureWorld(){
  if(world)return world;if(worldReady)return worldReady;
  worldReady=(async()=>{
+  const cargoState=await api('cargo?call='+encodeURIComponent(state.selected?.id||''));
+  if(cargoState.selfId)selfAvatarId=cargoState.selfId;
   const m=await import('./walk3d.js?v=24');
   world=m.mountWalk3D($('#world'),{
     profile:state.profile||{name:'나',style:'cardigan'},active:true,onHint:toast,
+    cargoItems:cargoState.items||[],cargoSelfId:cargoState.selfId,
+    onCargoAction:async(mode,itemId,position)=>{
+      const call=state.selected;
+      if(!call)throw new Error('먼저 운반할 모선을 선택해 주세요.');
+      const result=await api('cargo',{mode,itemId,callId:call.id,x:position.x,z:position.z});
+      selfAvatarId=result.selfId||selfAvatarId;
+      world?.setCargo?.(result.items,result.selfId);
+      if(mode==='drop')toast(result.message+' (출항 지연 '+(result.delayDays>0?'+':'')+result.delayDays+'일)');
+      return result;
+    },
     onNearby:setNearby,
     getSelfId:()=>selfAvatarId,
     onSeatChange:next=>{seatState=next;presence?.wake();renderHud();},
@@ -490,9 +502,9 @@ function startPresence(){
     if(recentGesture?.callId===presenceCallId()&&recentGesture?.until>Date.now()&&pose.motion!=='walk'){
       return {...pose,motion:recentGesture.motion,actionId:recentGesture.actionId};
     }
-    return {...pose,motion:['push','pull'].includes(pose.motion)?'idle':pose.motion,actionId:null};
+    return {...pose,style:state.profile?.style||'cardigan',motion:['push','pull'].includes(pose.motion)?'idle':pose.motion,actionId:null};
   },
-  onPeers:(rows,serverTime)=>world?.setLivePeers?.(rows,serverTime),
+  onPeers:(rows,serverTime,snapshot)=>{world?.setLivePeers?.(rows,serverTime);if(snapshot?.cargoItems)world?.setCargo?.(snapshot.cargoItems,snapshot.selfId);},
   onStatus:status=>{selfAvatarId=status.selfId;}
  });
 }
