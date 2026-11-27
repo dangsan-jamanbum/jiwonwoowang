@@ -338,9 +338,9 @@ export function mountWalk3D(container, options={}) {
         data.emission=emission;data.source.copy(wisp?emberAt:mouthAt);
         data.forward.copy(breathForward);
       }
-      const travel=wisp?.045*t:.08+1.02*t;
+      const travel=wisp ? .045*t : .08+1.02*t;
       puff.position.copy(data.source).addScaledVector(data.forward,travel);
-      puff.position.x+=(wisp?.18:.32)*t+Math.sin(t*4.4+i)*t*.042;
+      puff.position.x+=(wisp ? .18 : .32)*t+Math.sin(t*4.4+i)*t*.042;
       puff.position.z+=.08*t;
       puff.position.y+=(wisp?.79:.29)*t+.30*t*t;
       const fade=Math.min(1,age*4,(SMOKE_DURATION-age)*3);
