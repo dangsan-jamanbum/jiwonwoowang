@@ -90,7 +90,8 @@ export function mountTerminalMarquee(T,scene,renderer){
     ctx.textAlign='right';words(board.statusText,W-42,48,31,board.live?'#a2e4bd':'#ffc17e',700);
     words('BUSAN NEW PORT',W-42,87,24,'#accaCE',600);ctx.textAlign='left';
     const X=[46,601,792,987,1200], label='#9fbfc6';
-    ['모선 / 수출 항차','적하 계획','적하 완료','잔량(VAN)','선적 상태'].forEach((v,i)=>words(v,X[i],169,30,label,600));
+    const pncOfficial=board.live&&board.terminal==='pnc';
+    (pncOfficial?['모선 / 항차','양하(D)','적하(L)','Shift(S)','야드(Y)']:['모선 / 수출 항차','적하 계획','적하 완료','잔량(VAN)','선적 상태']).forEach((v,i)=>words(v,X[i],169,30,label,600));
     for(let i=0;i<3;i++){
       const y=187+i*85,row=board.rows[page*3+i];
       ctx.fillStyle=i%2?'#142f3a':'#193641';ctx.fillRect(20,y,W-40,80);
@@ -98,10 +99,17 @@ export function mountTerminalMarquee(T,scene,renderer){
       const w=row.loading||{};
       words(row.name,X[0],y+37,34,'#fff9e9',715,540);
       words([row.voy,row.berth].filter(Boolean).join('  ·  '),X[0],y+67,23,'#b6c9c8',600,540);
-      words(quantity(w.plan),X[1],y+53,35,'#f2d598',650,165);
-      words(quantity(w.completed),X[2],y+53,35,'#a2e4bd',700,171);
-      words(quantity(w.remainingVan),X[3],y+53,35,'#edf5ef',650,170);
-      words(loadingState(row),X[4],y+53,29,'#f2d598',620,210);
+      if(pncOfficial){
+        words(quantity(w.discharge),X[1],y+53,35,'#f2d598',650,165);
+        words(quantity(w.plan),X[2],y+53,35,'#a2e4bd',700,171);
+        words(quantity(w.shift),X[3],y+53,35,'#edf5ef',650,170);
+        words(quantity(w.yard),X[4],y+53,29,'#f2d598',620,210);
+      }else{
+        words(quantity(w.plan),X[1],y+53,35,'#f2d598',650,165);
+        words(quantity(w.completed),X[2],y+53,35,'#a2e4bd',700,171);
+        words(quantity(w.remainingVan),X[3],y+53,35,'#edf5ef',650,170);
+        words(loadingState(row),X[4],y+53,29,'#f2d598',620,210);
+      }
     }
     if(!board.rows.length)words(board.statusText.includes('연결 대기')?'공식 선적 자료 연결 대기':'표시할 선적 자료가 없습니다',X[0],240,36,'#c6d5d5');
     ctx.fillStyle='#274650';ctx.fillRect(20,455,W-40,2);
