@@ -9,8 +9,8 @@ import { PALM_CONTACTS, PALM_DURATION, palmPose } from './palm-beats.js';
 import { CHEER_PEAKS, CHEER_DURATION, cheerPose, mountCheers } from './shrine-gesture.js?v=16';
 import { mountTerminalMarquee, TERMINAL_WALL, TERMINAL_WALL_BOUNDS } from './terminal-marquee.js?v=17';
 import { buildDepartureOffice } from './departure-office.js?v=24';
-import { buildHarborLife } from './harbor-life.js?v=18';
-import { buildPortVehicles } from './port-vehicles.js?v=1';
+import { buildHarborLife } from './harbor-life.js?v=19';
+import { buildPortVehicles } from './port-vehicles.js?v=2';
 
 const { Vector3: V3 } = THREE;
 const clamp = (v, lo, hi) => Math.min(hi,Math.max(lo,v));
@@ -302,7 +302,11 @@ export function mountWalk3D(container, options={}) {
     helmet:new THREE.MeshStandardMaterial({color:0xf5d34f,roughness:.68}),
     equipment:new THREE.MeshStandardMaterial({color:0x477c83,metalness:.35,roughness:.62}),
     equipmentMetal:new THREE.MeshStandardMaterial({color:0xb8c3c1,metalness:.72,roughness:.38}),
-    beacon:new THREE.MeshStandardMaterial({color:0xe45b42,emissive:0x7d170c,emissiveIntensity:.45})
+    beacon:new THREE.MeshStandardMaterial({color:0xe45b42,emissive:0x7d170c,emissiveIntensity:.45}),
+    delayAura:new THREE.MeshBasicMaterial({color:0xff2938,transparent:true,opacity:.78,depthWrite:false,side:THREE.DoubleSide}),
+    cancelAura:new THREE.MeshBasicMaterial({color:0x35ed83,transparent:true,opacity:.78,depthWrite:false,side:THREE.DoubleSide}),
+    delayGlow:new THREE.MeshBasicMaterial({color:0xff2938,transparent:true,opacity:.16,depthWrite:false,side:THREE.DoubleSide}),
+    cancelGlow:new THREE.MeshBasicMaterial({color:0x35ed83,transparent:true,opacity:.16,depthWrite:false,side:THREE.DoubleSide})
   };
   function cargoPart(parent,geometry,material,x,y,z,sx=1,sy=1,sz=1){
     const mesh=new THREE.Mesh(geometry,material);mesh.position.set(x,y,z);mesh.scale.set(sx,sy,sz);
@@ -345,6 +349,15 @@ export function mountWalk3D(container, options={}) {
       for(const x of [-.25,.25])for(const z of [-.18,.18])
         cargoPart(g,new THREE.CylinderGeometry(.07,.07,.07,10),cargoMaterials.cloud,x,.07,z);
     }
+    const cancel=item.effect==='cancel';
+    const auraMat=cancel?cargoMaterials.cancelAura:cargoMaterials.delayAura;
+    const glowMat=cancel?cargoMaterials.cancelGlow:cargoMaterials.delayGlow;
+    const glow=new THREE.Mesh(new THREE.CircleGeometry(.86,28),glowMat);
+    glow.name='cargo-aura-glow';glow.rotation.x=-Math.PI/2;glow.position.y=.018;g.add(glow);
+    const aura=new THREE.Mesh(new THREE.TorusGeometry(.70,.045,7,32),auraMat);
+    aura.name='cargo-aura';aura.rotation.x=Math.PI/2;aura.position.y=.055;g.add(aura);
+    const outer=new THREE.Mesh(new THREE.TorusGeometry(.91,.018,6,32),auraMat);
+    outer.name='cargo-aura-outer';outer.rotation.x=Math.PI/2;outer.position.y=.035;outer.scale.setScalar(.98);g.add(outer);
     return g;
   }
   function syncCargoVisuals(){
@@ -357,14 +370,14 @@ export function mountWalk3D(container, options={}) {
       if(item.carrierId)parent=item.carrierId===cargoSelfId?local.group:peers.get(item.carrierId)?.fig.group||null;
       if(parent){
         if(visual.parent!==parent){visual.parent?.remove(visual);parent.add(visual);}
-        visual.visible=true;visual.position.set(0,.98,.47);visual.scale.setScalar(.84);visual.rotation.set(0,0,0);
+        visual.visible=true;visual.position.set(0,.98,.47);visual.scale.setScalar(.90);visual.rotation.set(0,0,0);
       }else if(item.carrierId){
         if(visual.parent!==scene){visual.parent?.remove(visual);scene.add(visual);}
         visual.visible=false;
       }else{
         if(visual.parent!==scene){visual.parent?.remove(visual);scene.add(visual);}
         const x=Number(item.x)||0,z=Number(item.z)||0;
-        visual.visible=true;visual.scale.setScalar(1);visual.position.set(x,measuredGround(x,z)+.02,z);visual.rotation.y=Number(item.yaw)||0;
+        visual.visible=true;visual.scale.setScalar(1.12);visual.position.set(x,measuredGround(x,z)+.02,z);visual.rotation.y=Number(item.yaw)||0;
       }
     }
     for(const [id,visual] of cargoVisuals)if(!cargoItems.some(v=>v.id===id&&!v.delivered)){visual.parent?.remove(visual);cargoVisuals.delete(id);}
@@ -984,7 +997,10 @@ export function mountWalk3D(container, options={}) {
   function watchShark() {
     if(!active||disposed||distance(player,zones.shark)>zones.shark.radius)return false;
     if(railView!=='shark')frameSharkFromHere();
-    options.onHint?.('북항이가 부두 옆을 헤엄치고 있어요.');return true;
+    const result=harborLife.fishShark?.()||'busy';
+    options.onHint?.(result==='started'?'낚싯대를 던졌어요! 잠시 기다리면 상어가 물고 회 접시가 가득 차요.':
+      result==='full'?'상어회 접시가 이미 가득 찼어요.':'낚싯줄을 당기는 중이에요!');
+    return true;
   }
   function placeLabels() {
     camera.updateMatrixWorld();
@@ -1015,6 +1031,11 @@ export function mountWalk3D(container, options={}) {
   }
   function setLight(value) {modeLight=['day','night','dusk'].includes(value)?value:'auto';lastKst=-100;}
   function ambient(dt) {
+    for(const visual of cargoVisuals.values()){
+      const pulse=1+.08*Math.sin(time*3.2+(visual.id?.length||0));
+      const aura=visual.getObjectByName('cargo-aura');if(aura)aura.scale.setScalar(pulse);
+      const outer=visual.getObjectByName('cargo-aura-outer');if(outer)outer.scale.setScalar(1.18-pulse*.12);
+    }
     if(time-lastKst>10) {
       const k=(new Date().getUTCHours()+9)%24;
       const amount=modeLight==='auto'?(k<6||k>=20?.92:k>=18||k<8?.47:0):modeLight==='night'?.92:modeLight==='dusk'?.47:0;
@@ -1407,7 +1428,7 @@ export function mountWalk3D(container, options={}) {
     if(celebration>7)feedback.hidden=true;
     set.update?.({time,night,push:shipPush,pull:shipPull,departure:0});
     court.update(time,night,reduceMotion);
-    marquee.update(time);office.update(time,distance(player,office.approach)<8);harborLife.update(time,night,reduceMotion);portVehicles.update(Date.now()/1000);
+    marquee.update(time);office.update(time,distance(player,office.approach)<8);if(harborLife.update(time,night,reduceMotion))options.onHint?.('상어 낚시 성공! 포장마차의 회 접시가 상어회로 가득 찼어요.');portVehicles.update(Date.now()/1000);
   }
   let frame=0,last=performance.now();
   function tick(stamp) {
