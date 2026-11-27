@@ -130,7 +130,7 @@ async function ensureWorld(){
  worldReady=(async()=>{
   const cargoState=await api('cargo?call='+encodeURIComponent(state.selected?.id||''));
   if(cargoState.selfId)selfAvatarId=cargoState.selfId;
-  const m=await import('./walk3d.js?v=26');
+  const m=await import('./walk3d.js?v=27');
   world=m.mountWalk3D($('#world'),{
     profile:state.profile||{name:'나',style:'cardigan'},active:true,onHint:toast,
     cargoItems:cargoState.items||[],cargoSelfId:cargoState.selfId,
