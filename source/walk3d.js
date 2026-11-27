@@ -196,6 +196,9 @@ export function mountWalk3D(container, options={}) {
   renderer.setPixelRatio(software?1:Math.min(1.6,window.devicePixelRatio||1));
   const host=element('div','position:absolute;inset:0;overflow:hidden;isolation:isolate;');
   host.append(canvas);container.replaceChildren(host);
+  const controlsHint=element('div','position:absolute;left:14px;bottom:14px;z-index:4;pointer-events:none;padding:7px 11px;border-radius:10px;background:rgba(19,39,48,.76);border:1px solid rgba(225,239,229,.25);color:#fff4df;font:600 12px/1.4 system-ui,sans-serif;letter-spacing:.01em;');
+  controlsHint.textContent='WASD 이동  ·  Shift 달리기  ·  E 화물 들기 / 내려놓기';
+  host.append(controlsHint);
   const scene=new THREE.Scene(), camera=new THREE.PerspectiveCamera(48,1,.12,265);
   const set=buildHarbor(THREE,scene);
   const zoneIds=['departure','arrival','shrine','control','smoking','yard'];
