@@ -13,7 +13,7 @@ export function buildHarbor(THREE,scene){
  box(scene,3.2,3.2,4.2,22,3.5,-2,white);box(scene,2.8,.2,3.5,22,5.2,-2,blue);cylinder(scene,.12,.12,3,23,6.7,-2,dark);
  const arrivalShip=box(scene,15,1.7,4.6,37,.15,-4,hullMat);arrivalShip.userData.vessel='arrival';box(scene,12,.3,4.3,37,1.15,-4,deckMat);
  for(let i=0;i<3;i++)box(scene,3,1.3,2,33+i*3.7,1.9,-4,[blue,red,yellow][i]);
- const zones={departure:{x:15,z:4,radius:3.8,yaw:Math.PI,anchor:{x:6,y:1.1,z:-2}},arrival:{x:37,z:-4,radius:4.8,yaw:-Math.PI/2,anchor:{x:29,y:1.1,z:-4}},shrine:{x:-25,z:17,radius:10,yaw:.15},control:{x:0,z:16,radius:5,yaw:0},smoking:{x:-28,z:-5,radius:3.5,yaw:0},yard:{x:-8,z:-10,radius:7,yaw:Math.PI/2}};
+ const zones={departure:{x:15,z:4,radius:3.8,yaw:Math.PI,anchor:{x:6,y:1.1,z:-2}},arrival:{x:27,z:-4,radius:4.8,yaw:-Math.PI/2,anchor:{x:29,y:1.1,z:-4}},shrine:{x:-25,z:17,radius:10,yaw:.15},control:{x:5,z:12,radius:5,yaw:0},smoking:{x:-28,z:-5,radius:3.5,yaw:0},yard:{x:-16,z:-10,radius:7,yaw:Math.PI/2}};
  box(scene,5,3.5,4,-2,1.75,17,white);box(scene,5.2,.35,4.2,-2,3.65,17,blue);
  for(let i=0;i<5;i++)box(scene,2.4,2.4,2.4,-29+(i%2)*3,1.2,-5+Math.floor(i/2)*3,i%2?red:blue);
  for(const [x,z] of [[-19,6],[-4,8],[28,8],[4,-21]]){cylinder(scene,.12,.16,5,x,2.5,z,dark);const lamp=new T.PointLight(0xffd49a,1.2,9);lamp.position.set(x,5,z);scene.add(lamp);box(scene,.65,.15,.65,x,5,z,yellow);}
