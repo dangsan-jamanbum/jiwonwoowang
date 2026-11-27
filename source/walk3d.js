@@ -1428,7 +1428,7 @@ export function mountWalk3D(container, options={}) {
     if(celebration>7)feedback.hidden=true;
     set.update?.({time,night,push:shipPush,pull:shipPull,departure:0});
     court.update(time,night,reduceMotion);
-    marquee.update(time);office.update(time,distance(player,office.approach)<8);if(harborLife.update(time,night,reduceMotion))options.onHint?.('상어 낚시 성공! 포장마차의 회 접시가 상어회로 가득 찼어요.');portVehicles.update(Date.now()/1000);
+    marquee.update(time);office.update(time,distance(player,office.approach)<8);if(harborLife.update(time,night,reduceMotion)){options.onFishCaught?.();options.onHint?.('상어 낚시 성공! 포장마차의 회 접시가 상어회로 가득 찼어요.');}portVehicles.update(Date.now()/1000);
   }
   let frame=0,last=performance.now();
   function tick(stamp) {
@@ -1453,5 +1453,5 @@ export function mountWalk3D(container, options={}) {
   on(canvas,'webglcontextlost',e=>{e.preventDefault();if(!disposed)options.onHint?.('3D 화면 연결을 복구하고 있어요.');});
   joystick.style.display=active&&touchDevice?'flex':'none';local.group.position.copy(player);local.group.rotation.y=heading;
   bindVessels();updateShadow(local);adjustView(1);frame=requestAnimationFrame(tick);
-  return {available:true,renderer:software?'canvas3d':'webgl',getZonePosition:id=>zones[id],getNearbyShrine:()=>nearbyShrine,watchShark,getPresence,setLivePeers,goToPeer,goTo,goToWish,actAtDock,act,smoke,eatFishcake,toggleSeat,sitAt,standUp,getSeatState,cheer,sayChat,canCheerHere,approachGuardian,interactNearShrine,hasCargoInteraction:()=>Boolean(carriedCargoId||nearestCargo()),interactCargo,home,zoomBy,setActive,setProfile,setPeers,setNeighbors,setVessel,bindVessels,setBoard:state=>marquee.setBoard(state),setDepartures:(calls,terminal)=>office.setDepartures(calls,terminal),replayDeparture:()=>office.replay(),setWishes:(call,wishes)=>court.setWishes(call,wishes),setWeather,setLight,celebrate,setCargo,dispose,destroy:dispose};
+  return {available:true,renderer:software?'canvas3d':'webgl',getZonePosition:id=>zones[id],getNearbyShrine:()=>nearbyShrine,watchShark,getPresence,setLivePeers,goToPeer,goTo,goToWish,actAtDock,act,smoke,eatFishcake,toggleSeat,sitAt,standUp,getSeatState,cheer,sayChat,canCheerHere,approachGuardian,interactNearShrine,hasCargoInteraction:()=>Boolean(carriedCargoId||nearestCargo()),interactCargo,home,zoomBy,setActive,setProfile,setPeers,setNeighbors,setVessel,bindVessels,setBoard:state=>marquee.setBoard(state),setDepartures:(calls,terminal)=>office.setDepartures(calls,terminal),replayDeparture:()=>office.replay(),setWishes:(call,wishes)=>court.setWishes(call,wishes),setWeather,setLight,celebrate,setCargo,setSashimiPlate:harborLife.setSashimiPlate,dispose,destroy:dispose};
 }
