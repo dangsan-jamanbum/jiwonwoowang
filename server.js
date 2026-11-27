@@ -9,6 +9,13 @@ const sessions = new Map();
 const presence = new Map();
 const chats = [];
 const wishes = [];
+const cargoItems = [
+  {id:'cargo-pnc-001',name:'수출 컨테이너 화물',x:-7.3,z:-55.6,yaw:0,carrierId:null,delivered:false},
+  {id:'cargo-pnc-002',name:'팔레트 화물',x:-9.5,z:-55.1,yaw:.18,carrierId:null,delivered:false},
+  {id:'cargo-pnc-003',name:'목재 포장 화물',x:-5.1,z:-55.1,yaw:-.18,carrierId:null,delivered:false}
+];
+const delayByCall = new Map();
+const cargoEvents = [];
 let calls = [
   { id:'demo-pnc-001', terminal:'pnc', name:'ATD 부산항 연습선', voy:'DEMO-001', outboundVoy:'DEMO-001', inboundVoy:'DEMO-001', carrierVoy:'DEMO-001', berth:'연습 부두', berthPhase:'alongside', etd:null, etb:null, atd:null, atdVerified:false, isDemo:true },
   { id:'demo-pnit-001', terminal:'pnit', name:'ATD 북항 연습선', voy:'DEMO-002', outboundVoy:'DEMO-002', inboundVoy:'DEMO-002', carrierVoy:'DEMO-002', berth:'연습 부두', berthPhase:'alongside', etd:null, etb:null, atd:null, atdVerified:false, isDemo:true }
@@ -121,12 +128,15 @@ async function stateFor(session,url){
   const pnc=await getPncSchedule();
   const terminalCalls=calls.filter(c=>c.terminal===terminal);
   const source=terminal==='pnc'?pnc.source:{kind:'demo',label:'부산북항 예시 일정',checkedAt:new Date().toISOString(),stale:false};
-  const terminalStatus={calls:terminalCalls,yardTrucks:[],source};
   const requested=url.searchParams.get('call');
   const selected=terminalCalls.find(c=>!requested||c.id===requested)||terminalCalls[0]||null;
+  const terminalStatus={calls:terminalCalls.map(c=>({...c,delayDays:delayByCall.get(c.id)||0})),yardTrucks:[],source,
+    delayDays:selected?(delayByCall.get(selected.id)||0):0,
+    delayEvents:selected?cargoEvents.filter(e=>e.callId===selected.id).slice(-4).reverse():[]};
   const peers=[...presence.values()].filter(p=>p.terminal===terminal);
   return {profile:session.profile?profileFor(session):null,selected,terminal,terminals:[{id:'pnc',name:'부산신항'},{id:'pnit',name:'부산북항'}],calls:terminalCalls,terminalStatus,room:selected?roomFor(session,selected.id):{participants:0,pushes:0,pulls:0,peers:[],recent:[]},wishes:wishes.filter(w=>w.callId===selected?.id),nearby:[],changes:[],confirmedDepartures:[],weather:{code:'clear'},source,online:peers.length+1};
 }
+function stateForCallId(url){return url.searchParams.get('call')||calls.find(c=>c.terminal===(url.searchParams.get('terminal')||'pnc'))?.id||'';}
 function sendStatic(req,res){
   let pathname=decodeURIComponent(new URL(req.url,'http://localhost').pathname);
   if(pathname==='/favicon.ico')pathname='/favicon.svg';
@@ -154,7 +164,12 @@ const server=http.createServer(async(req,res)=>{
       const terminal=url.searchParams.get('terminal')==='pnit'?'pnit':'pnc';
       const pnc=await getPncSchedule();
       const source=terminal==='pnc'?pnc.source:{kind:'demo',label:'부산북항 예시 일정',checkedAt:new Date().toISOString(),stale:false};
-      return json(res,200,{terminal,calls:calls.filter(c=>c.terminal===terminal),yardTrucks:[],source});
+      const rows=calls.filter(c=>c.terminal===terminal).map(c=>({...c,delayDays:delayByCall.get(c.id)||0}));
+      return json(res,200,{terminal,calls:rows,yardTrucks:[],source,delayDays:rows.length?(delayByCall.get(rows[0].id)||0):0,delayEvents:cargoEvents.filter(e=>rows.some(c=>c.id===e.callId)).slice(-4).reverse()});
+    }
+    if(req.method==='GET' && route==='cargo'){
+      const callId=url.searchParams.get('call')||stateForCallId(url);
+      return json(res,200,{selfId:session.id,items:cargoItems.filter(v=>!v.delivered),delayDays:delayByCall.get(callId)||0,events:cargoEvents.filter(e=>e.callId===callId).slice(-8).reverse()});
     }
     if(req.method==='GET' && route==='search'){
       const q=(url.searchParams.get('q')||'').toLowerCase();
@@ -194,6 +209,33 @@ const server=http.createServer(async(req,res)=>{
         if(body.mode==='pull')session.pulls++;
         return json(res,200,{ok:true});
       }
+      if(route==='cargo'){
+        await getPncSchedule();
+        const item=cargoItems.find(v=>v.id===body.itemId&&!v.delivered);
+        if(!item)return json(res,404,{error:'화물을 찾을 수 없습니다.'});
+        const callId=String(body.callId||'');
+        if(!calls.some(c=>c.id===callId))return json(res,404,{error:'모선을 먼저 선택해 주세요.'});
+        if(body.mode==='pickup'){
+          if(item.carrierId&&item.carrierId!==session.id)return json(res,409,{error:'다른 작업자가 이미 운반 중인 화물입니다.'});
+          item.carrierId=session.id;
+        }else if(body.mode==='drop'){
+          if(item.carrierId!==session.id)return json(res,409,{error:'현재 들고 있는 화물이 아닙니다.'});
+          const x=Number(body.x),z=Number(body.z);
+          if(!Number.isFinite(x)||!Number.isFinite(z))return json(res,400,{error:'내려놓을 위치가 올바르지 않습니다.'});
+          item.carrierId=null;item.x=x;item.z=z;
+          const delivered=Math.hypot(x-10.8,z-5)<=4.5;
+          item.delivered=delivered;
+          const deltaDays=delivered?-1:1;
+          const total=(delayByCall.get(callId)||0)+deltaDays;
+          delayByCall.set(callId,total);
+          const event={id:randomUUID(),callId,itemId:item.id,itemName:item.name,actor:profileFor(session).name,
+            mode:'delivery',delivered,deltaDays,totalDays:total,createdAt:new Date().toISOString()};
+          cargoEvents.push(event);if(cargoEvents.length>300)cargoEvents.shift();
+        }else return json(res,400,{error:'지원하지 않는 화물 작업입니다.'});
+        return json(res,200,{selfId:session.id,items:cargoItems.filter(v=>!v.delivered),delayDays:delayByCall.get(callId)||0,
+          events:cargoEvents.filter(e=>e.callId===callId).slice(-8).reverse(),
+          message:body.mode==='pickup'?'화물을 들었습니다. 출항 부두에 내려놓으면 지연이 1일 줄어듭니다.':item.delivered?'선적 완료! 출항 지연이 1일 줄었습니다.':'화물을 지정 선적 구역 밖에 내려놓아 지연이 1일 늘었습니다.'});
+      }
       if(route==='chat'){
         const message={id:chats.length?chats[chats.length-1].id+1:1,terminal:String(body.terminal||'busan'),text:String(body.text||'').trim().slice(0,300),avatarId:session.id,name:profileFor(session).name,createdAt:new Date().toISOString()};
         if(!message.text)return json(res,400,{error:'메시지를 입력해 주세요.'});
@@ -204,7 +246,9 @@ const server=http.createServer(async(req,res)=>{
         presence.set(selfId,entry);
         for(const [id,p] of presence)if(Date.now()-p.seenAt>10000)presence.delete(id);
         const peers=[...presence.values()].filter(p=>p.terminal===body.terminal&&p.callId===body.callId);
-        return json(res,200,{selfId,selfName:entry.name,serverTime:Date.now(),online:peers.length,peers:peers.filter(p=>p.selfId!==selfId).map(p=>({avatarId:p.selfId,name:p.name,x:p.x||0,y:p.y||0,z:p.z||0,yaw:p.yaw||0,motion:p.motion||'idle',actionId:p.actionId||null}))});
+        return json(res,200,{selfId,selfName:entry.name,serverTime:Date.now(),online:peers.length,
+          cargoItems:cargoItems.filter(v=>!v.delivered),
+          peers:peers.filter(p=>p.selfId!==selfId).map(p=>({id:p.selfId,avatarId:p.selfId,name:p.name,style:p.style,x:p.x||0,y:p.y||0,z:p.z||0,yaw:p.yaw||0,motion:p.motion||'idle',cargoId:p.cargoId||null,actionId:p.actionId||null,updatedAt:p.seenAt}))});
       }
     }
     return json(res,404,{error:'지원하지 않는 API입니다.'});
