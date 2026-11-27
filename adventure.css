@@ -1,5 +1,5 @@
-@font-face{font-family:AtdPret;src:url('/assets/pretendard.woff2') format('woff2');font-weight:100 900;font-display:swap}
-:root{--ink:#1e3540;--paper:#fff9e9;--glass:#192d3be0;--edge:#fff5d44a;font-family:AtdPret,"Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+
+:root{--ink:#1e3540;--paper:#fff9e9;--glass:#192d3be0;--edge:#fff5d44a;font-family:system-ui,"Apple SD Gothic Neo","Malgun Gothic",sans-serif}
 html,body,#game-shell{width:100%;height:100%;margin:0}body{background:#16273a;overflow:hidden}
 #harbor-app{position:relative;width:100%;height:100vh;height:100dvh;min-height:230px;isolation:isolate;overflow:hidden;color:var(--paper);user-select:none}
 #harbor-app [hidden]{display:none!important}
@@ -23,14 +23,14 @@ html,body,#game-shell{width:100%;height:100%;margin:0}body{background:#16273a;ov
 .walk-bottom{left:clamp(16px,2vw,36px);bottom:max(17px,env(safe-area-inset-bottom));display:flex;align-items:center;gap:11px}
 .quay-more{padding:6px 11px;border-radius:20px;font-size:13px;display:inline-flex;align-items:center;gap:6px}
 .key-legend{font-size:13px;color:white;font-weight:600;text-shadow:0 1px 5px #162332,0 1px 8px #243b48}
-.key-legend kbd,.walk-start kbd{font:650 11px/1.4 AtdPret,sans-serif;border:1px solid currentColor;border-radius:5px;padding:1px 4px;margin-right:4px}
+.key-legend kbd,.walk-start kbd{font:650 11px/1.4 system-ui,sans-serif;border:1px solid currentColor;border-radius:5px;padding:1px 4px;margin-right:4px}
 .context-action{left:50%;bottom:clamp(18px,4.5vh,45px);transform:translateX(-50%);display:grid;justify-items:center;gap:5px;white-space:nowrap}.context-action.off{display:none}
 .context-action p:not(:empty){font-size:13px;padding:3px 10px;border-radius:20px;background:#172d3bd6;color:white}
 .walk-start{display:inline-flex;align-items:center;gap:5px;border-radius:22px;padding:10px 19px;background:#fff0c9;color:var(--ink);border:1px solid #fff7e4;box-shadow:0 3px 10px #1828374d;font-weight:750;font-size:16px;letter-spacing:-.025em}
 .quay-more{font-size:12px;padding:3px 10px}
 #scene-caption{bottom:26%;left:50%;transform:translateX(-50%);color:#ffedbd;text-shadow:0 2px 6px #143347;font-weight:850;font-size:27px;white-space:nowrap}
 #toast{background:#fff0ce;color:var(--ink);border:1px solid #f5ddb4;box-shadow:0 4px 16px #12233545;bottom:18%}
-dialog{font-family:AtdPret,sans-serif}button:focus-visible{outline-color:#ffc47d}
+dialog{font-family:system-ui,sans-serif}button:focus-visible{outline-color:#ffc47d}
 .atlas{display:grid;gap:14px;padding:12px 20px 21px}.atlas-image{position:relative;aspect-ratio:2/1;border-radius:12px;background:#abc8c5 url('/assets/walk-map.svg?v=16') center/100% 100% no-repeat}
 .atlas-pin{position:absolute;transform:translate(-50%,-50%);display:grid;place-items:center;border:2px solid #fae9b8;border-radius:50%;background:#214a55;color:#fff2c9;width:29px;height:29px;box-shadow:0 2px 5px #18394a99}.atlas-pin:hover{background:#436c71}
 .atlas-list{display:grid;grid-template-columns:1fr 1fr;gap:7px}.atlas-list button,.record-list button{border:1px solid #d7dfd6;border-radius:10px;text-align:left;padding:9px 12px;background:#f0f3ec;color:var(--ink);font-weight:700;display:flex;align-items:center;gap:8px}.atlas-list small{color:#587267;font-size:12px;margin-left:auto;font-weight:400}
