@@ -348,7 +348,6 @@ const server=http.createServer(async(req,res)=>{
       const original=await originalApi('search',{q,terminal});
       if(original.data&&Array.isArray(original.data.calls)){
         const rows=original.data.calls;
-        for(const term of ['pnc','pnit'])applyOriginalCalls(term,rows.filter(c=>(c.terminal||term)===term));
         return json(res,200,{...original.data,calls:rows,stale:original.stale});
       }
       await getPncSchedule();
