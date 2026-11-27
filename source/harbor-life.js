@@ -281,6 +281,9 @@ export function buildHarborLife(T, scene) {
   }
   const dayTransmission=new T.Color('#84acb4'),nightTransmission=new T.Color('#507e91');
   let sceneTime=0,fishingStartedAt=null,plateFilled=false;
+  function setSashimiPlate(){
+    fishingStartedAt=null;plateFilled=true;fillSashimiPlate();
+  }
   function fishShark(){
     if(plateFilled)return 'full';
     if(fishingStartedAt!==null)return 'busy';
@@ -318,5 +321,5 @@ export function buildHarborLife(T, scene) {
     return Math.abs(dx*c-dz*s)<.58&&Math.abs(dx*s+dz*c)<.29;
   }
   function dispose(){scene.remove(group);resources.forEach(resource=>resource.dispose());resources.clear();}
-  update();return {group,booth,shark,sharkWatch:SHARK_WATCH,approach:EOMUK_ZONE,blocks,update,fishShark,dispose};
+  update();return {group,booth,shark,sharkWatch:SHARK_WATCH,approach:EOMUK_ZONE,blocks,update,fishShark,setSashimiPlate,dispose};
 }
