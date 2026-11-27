@@ -507,7 +507,7 @@ function startPresence(){
     }
     return {...pose,style:state.profile?.style||'cardigan',motion:['push','pull'].includes(pose.motion)?'idle':pose.motion,actionId:null};
   },
-  onPeers:(rows,serverTime,snapshot)=>{world?.setLivePeers?.(rows,serverTime);if(snapshot?.cargoItems)world?.setCargo?.(snapshot.cargoItems,snapshot.selfId);if(typeof snapshot?.sashimiPlateFull==='boolean')world?.setSashimiPlate?.(snapshot.sashimiPlateFull);},
+  onPeers:(rows,serverTime,snapshot)=>{world?.setLivePeers?.(rows,serverTime);if(snapshot?.cargoItems)world?.setCargo?.(snapshot.cargoItems,snapshot.selfId);if(typeof snapshot?.sashimiPlateFull==='boolean')world?.setSashimiPlate?.(snapshot.sashimiPlateFull,!!snapshot.sharkEaten);},
   onStatus:status=>{selfAvatarId=status.selfId;}
  });
 }
