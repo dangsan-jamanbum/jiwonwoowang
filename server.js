@@ -52,11 +52,11 @@ function makeCargoSpawnPoints(count,starterCount=48){
 }
 const cargoBlueprints=[];
 for(const [index,[kind,name]] of delayCargoTypes.entries()){
-  const copies=index%2===0?8:7;
+  const copies=index%2===0?4:3;
   for(let copy=0;copy<copies;copy++)cargoBlueprints.push({effect:'delay',kind,name,copy:copy+1});
 }
 for(const [index,[kind,name]] of cancelCargoTypes.entries()){
-  const copies=index%2===0?8:7;
+  const copies=index%2===0?4:3;
   for(let copy=0;copy<copies;copy++)cargoBlueprints.push({effect:'cancel',kind,name,copy:copy+1});
 }
 const cargoSpawns=makeCargoSpawnPoints(cargoBlueprints.length,48);
