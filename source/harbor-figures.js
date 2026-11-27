@@ -278,20 +278,45 @@ function addEomuk(k,holder){
 
 function buildRig(T,style,guardian){
   const k=kit(T),{group,orb,rings,tube,plaque,rect,lock}=k;
-  const f=style==='cardigan', g=guardian||'';
+  const h=style==='honghong', f=style==='cardigan'||h, g=guardian||'';
   const themes={
     poseidon:{hair:'#365e75',hairLight:'#608697',brow:'#38556a',skin:'#deb18e',coat:'#749ca2'},
     njord:{hair:'#7f7566',hairLight:'#b1a28b',brow:'#766558',skin:'#ddba9e',coat:'#6e8174'},
     yi:{hair:'#333338',hairLight:'#484249',brow:'#383334',skin:'#deb08c',coat:'#56544e'},
     jang:{hair:'#393437',hairLight:'#504347',brow:'#423534',skin:'#e5b592',coat:'#504549'}
   };
-  const theme=themes[g]||{skin:'#efc29f',hair:f?'#3c3335':'#352e2e',hairLight:f?'#514248':'#51433f',brow:'#4b403d',coat:f?'#91ad97':'#344957'};
+  const theme=themes[g]||(h?{skin:'#efc29f',hair:'#eee9df',hairLight:'#ffffff',brow:'#5b4a42',coat:'#f5f1e8'}:{skin:'#efc29f',hair:f?'#3c3335':'#352e2e',hairLight:f?'#514248':'#51433f',brow:'#4b403d',coat:f?'#91ad97':'#344957'});
   const G=group(null),body=group(G,0,.85,0), chest=group(body),head=group(chest,0,1.003,.017);
-  const skin=theme.skin,shirt='#f4edda',coat=theme.coat,pants=g?'#515d68':'#495563';
-  const hem=g?'#b3a185':f?'#84a48c':'#344b5a';
+  const skin=theme.skin,shirt='#fffdf7',coat=theme.coat,pants=g?'#515d68':h?'#eee9df':'#495563';
+  const hem=g?'#b3a185':h?'#e6dfd2':f?'#84a48c':'#344b5a';
   const eyes=g?guardianFace(k,head,theme,g):face(k,head,theme);
   if(!g){
-    hair(k,head,style,theme);
+    hair(k,head,h?'cardigan':style,theme);
+    if(h){
+      // Long white hair, red headband marked 홍홍, round glasses; no weapon.
+      for(const side of [-1,1]){
+        lock(head,[[side*.285,.20,-.045],[side*.355,-.015,-.12],[side*.365,-.30,-.17],[side*.31,-.58,-.13],[side*.27,-.79,-.06]],.075,.035,'#f8f5ed');
+        lock(head,[[side*.19,.29,-.16],[side*.26,.04,-.29],[side*.25,-.25,-.32],[side*.20,-.53,-.25],[side*.16,-.75,-.17]],.060,.027,'#e5e0d8');
+      }
+      const band=group(head,0,.245,.286);
+      rect(band,0,0,0,.59,.075,.025,.018,'#c92332');
+      const ink='#fff5e9';
+      function stroke(points){tube(band,points,.008,ink,12);}
+      function glyph(cx){
+        stroke([[cx-.052,.012,.021],[cx+.052,.012,.021]]);
+        stroke([[cx-.035,.027,.021],[cx+.035,.027,.021]]);
+        stroke([[cx,.026,.021],[cx,.001,.021]]);
+        const circle=mesh(band,new T.TorusGeometry(.018,.006,5,12),ink,cx,-.014,.022);
+      }
+      glyph(-.105);glyph(.105);
+      for(const side of [-1,1]){
+        const lens=mesh(head,new T.TorusGeometry(.073,.008,5,16),'#493f38',side*.137,-.005,.340);
+        lens.scale.set(1,.82,1);
+        tube(head,[[side*.064,-.004,.342],[side*.018,.002,.348],[-side*.018,.002,.348],[-side*.064,-.004,.342]],.006,'#493f38',10);
+        tube(head,[[side*.208,.018,.315],[side*.30,.032,.245]],.006,'#493f38',8);
+      }
+      tube(chest,[[-.17,.55,.14],[-.10,.39,.18],[.00,.20,.18],[.13,.02,.15]],.018,'#80543a',20);
+    }
     // A vertically oriented egg in the front and profile cameras. The heavier
     // lower face follows an actual sculpted surface around both cheeks.
     head.scale.set(f?.889:.918,1.085,f?.991:1.005);
@@ -1017,7 +1042,7 @@ function performer(T,style,g){
 /** Build a smooth, fully rigged Korean office-worker avatar. Positive Z is
  * forward. Set walk/push/pull/coffee/phone to 0..1 and time in seconds. */
 export function makeWorker(THREE,style='cardigan'){
-  return performer(THREE,style==='vest'?'vest':'cardigan','');
+  return performer(THREE,style==='vest'?'vest':style==='honghong'?'honghong':'cardigan','');
 }
 export function makeGuardian(THREE,id='poseidon'){
   const ids={poseidon:'poseidon','포세이돈':'poseidon',njord:'njord','뇨르드':'njord',yi:'yi',yisunshin:'yi','이순신':'yi',jang:'jang',jangbogo:'jang','장보고':'jang'};
