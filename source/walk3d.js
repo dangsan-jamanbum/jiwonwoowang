@@ -1359,7 +1359,7 @@ export function mountWalk3D(container, options={}) {
     if(celebration>7)feedback.hidden=true;
     set.update?.({time,night,push:shipPush,pull:shipPull,departure:0});
     court.update(time,night,reduceMotion);
-    marquee.update(time);office.update(time,distance(player,office.approach)<8);harborLife.update(time,night,reduceMotion);portVehicles.update(time);
+    marquee.update(time);office.update(time,distance(player,office.approach)<8);harborLife.update(time,night,reduceMotion);portVehicles.update(Date.now()/1000);
   }
   let frame=0,last=performance.now();
   function tick(stamp) {
