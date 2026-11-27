@@ -81,11 +81,11 @@ function parsePncSchedule(payload){
   }
   // PNC MN014 실제 표는 No.부터 업데이트 일시까지 17개 열로 제공된다.
   // td 개수/첫 열의 태그 형태가 바뀌어도 모선코드(예: ANEM-003/2026)를 기준으로 찾는다.
-  const htmlRows=[...source.matchAll(/<tr\\b[^>]*>([\\s\\S]*?)<\\/tr>/gi)];
+  const htmlRows=[...source.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)];
   const found=[];
   for(const row of htmlRows){
-    const cells=[...row[1].matchAll(/<t[dh]\\b[^>]*>([\\s\\S]*?)<\\/t[dh]>/gi)].map(m=>cellText(m[1]));
-    const codeIndex=cells.findIndex(v=>/^[A-Z0-9-]+\\s*\\/\\s*20\\d{2}$/i.test(v));
+    const cells=[...row[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map(m=>cellText(m[1]));
+    const codeIndex=cells.findIndex(v=>/^[A-Z0-9-]+\s*\/\s*20\d{2}$/i.test(v));
     if(codeIndex<1)continue;
     const name=cells[codeIndex-1]||'';
     const terminalVoy=cells[codeIndex]||'';
@@ -97,7 +97,7 @@ function parsePncSchedule(payload){
     const etb=pncDate(cells[codeIndex+5]);
     const etd=pncDate(cells[codeIndex+6]);
     const terminalCode=terminalVoy.split('/')[0].trim();
-    const year=(terminalVoy.match(/20\\d{2}/)||[])[0];
+    const year=(terminalVoy.match(/20\d{2}/)||[])[0];
     const discharge=Number(String(cells[codeIndex+9]||'').replace(/,/g,''))||0;
     const load=Number(String(cells[codeIndex+10]||'').replace(/,/g,''))||0;
     const berth=cells[codeIndex+7]||'미정';
@@ -117,14 +117,14 @@ function parsePncSchedule(payload){
   const unique=[...new Map(found.map(c=>[c.id,c])).values()];
   if(unique.length)return unique;
   // 일부 응답은 태그 대신 표의 텍스트만 포함하므로 행 텍스트도 보조로 검사한다.
-  const text=cellText(source.replace(/<\\/(?:tr|td|th|div|p)>/gi,'\\n'));
-  const lines=text.split(/\\n+/).map(v=>v.trim()).filter(Boolean);
+  const text=cellText(source.replace(/<\/(?:tr|td|th|div|p)>/gi,'\n'));
+  const lines=text.split(/\n+/).map(v=>v.trim()).filter(Boolean);
   for(let i=0;i<lines.length;i++){
-    const match=lines[i].match(/^(.+?)\\s+([A-Z0-9-]+\\/20\\d{2})\\s+([A-Z0-9/]+)\\s+([A-Z]{2,4})\\s+([A-Z0-9 ]+)\\s+(Port|Star)\\s+(20\\d{2}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2})\\s+(20\\d{2}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2})\\s+(B\\d+)/i);
+    const match=lines[i].match(/^(.+?)\s+([A-Z0-9-]+\/20\d{2})\s+([A-Z0-9/]+)\s+([A-Z]{2,4})\s+([A-Z0-9 ]+)\s+(Port|Star)\s+(20\d{2}-\d{2}-\d{2}\s+\d{2}:\d{2})\s+(20\d{2}-\d{2}-\d{2}\s+\d{2}:\d{2})\s+(B\d+)/i);
     if(!match)continue;
     const [,name,terminalVoy,carrierVoy,operator,route,,etbText,etdText,berth]=match;
     const [inboundVoy='',outboundVoy='']=carrierVoy.split('/');
-    const terminalCode=terminalVoy.split('/')[0],year=(terminalVoy.match(/20\\d{2}/)||[])[0];
+    const terminalCode=terminalVoy.split('/')[0],year=(terminalVoy.match(/20\d{2}/)||[])[0];
     found.push({id:'official.busan.pnc.'+terminalCode+'.'+year,name,terminal:'pnc',port:'busan',
       terminalVoy,carrierVoy,inboundVoy,outboundVoy,voy:outboundVoy||inboundVoy,operator,route,berth,
       etb:pncDate(etbText),etd:pncDate(etdText),atb:null,atd:null,atdVerified:false,
