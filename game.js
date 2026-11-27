@@ -134,6 +134,7 @@ async function ensureWorld(){
   world=m.mountWalk3D($('#world'),{
     profile:state.profile||{name:'나',style:'cardigan'},active:true,onHint:toast,
     cargoItems:cargoState.items||[],cargoSelfId:cargoState.selfId,
+    onFishCaught:()=>{api('fishing',{mode:'catch'}).catch(()=>{});},
     onCargoAction:async(mode,itemId,position)=>{
       const call=state.selected;
       if(!call)throw new Error('먼저 운반할 모선을 선택해 주세요.');
@@ -504,7 +505,7 @@ function startPresence(){
     }
     return {...pose,style:state.profile?.style||'cardigan',motion:['push','pull'].includes(pose.motion)?'idle':pose.motion,actionId:null};
   },
-  onPeers:(rows,serverTime,snapshot)=>{world?.setLivePeers?.(rows,serverTime);if(snapshot?.cargoItems)world?.setCargo?.(snapshot.cargoItems,snapshot.selfId);},
+  onPeers:(rows,serverTime,snapshot)=>{world?.setLivePeers?.(rows,serverTime);if(snapshot?.cargoItems)world?.setCargo?.(snapshot.cargoItems,snapshot.selfId);if(snapshot?.sashimiPlateFull)world?.setSashimiPlate?.();},
   onStatus:status=>{selfAvatarId=status.selfId;}
  });
 }
