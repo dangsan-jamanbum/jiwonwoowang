@@ -1,5 +1,5 @@
 import * as THREE from './vendor/three.module.js';
-import { makeWorker, makeGuardian } from './harbor-figures.js?v=19';
+import { makeWorker, makeGuardian } from './harbor-figures.js?v=20';
 import { buildHarbor } from './harbor-set.js?v=22';
 import { CY_STACK_BOUNDS } from './cy-yard.js';
 import { buildGuardianCourt } from './guardian-court.js';
@@ -266,7 +266,7 @@ export function mountWalk3D(container, options={}) {
     // Figures own geometry/materials through their factory; shared materials may be cached.
     fig.dispose?.();
   }
-  let profile=options.profile || {},style=profile.style==='vest'?'vest':'honghong', local=addFigure(style);
+  let profile=options.profile || {},style=profile.style==='vest'?'vest':profile.style==='honghong'?'honghong':'cardigan', local=addFigure(style);
   const sharkDishProp=new THREE.Group();sharkDishProp.name='손에 든 상어 요리';local.handR.add(sharkDishProp);sharkDishProp.position.set(0,.018,.055);sharkDishProp.visible=false;
   const dishBowl=new THREE.Mesh(new THREE.CylinderGeometry(.105,.085,.035,16),new THREE.MeshStandardMaterial({color:'#f1e5ce',roughness:.72}));dishBowl.position.y=.018;sharkDishProp.add(dishBowl);
   const dishFoods={
@@ -939,12 +939,12 @@ export function mountWalk3D(container, options={}) {
       if(!p){
         const label=element('div','position:absolute;left:0;top:0;display:none;padding:3px 8px;border-radius:10px;color:#fffaf0;background:rgba(27,50,62,.91);border:1px solid #ffffffaa;box-shadow:0 1px 4px #0b263048;font:700 12px/1.35 system-ui;white-space:nowrap;max-width:18em;overflow:hidden;text-overflow:ellipsis;');
         label.className='harbor-live-nickname';labels.append(label);
-        p={fig:addFigure(row.style==='vest'?'vest':'cardigan'),style:row.style,label,tx:x,tz:z,yaw,ts:0,seen:now,started:-10000,actionMode:null,queue:[],played:new Map(),beats:0,vx:0,vz:0,walk:0,phase:stableRandom()*5};
+        p={fig:addFigure(row.style==='vest'?'vest':row.style==='honghong'?'honghong':'cardigan'),style:row.style,label,tx:x,tz:z,yaw,ts:0,seen:now,started:-10000,actionMode:null,queue:[],played:new Map(),beats:0,vx:0,vz:0,walk:0,phase:stableRandom()*5};
         p.fig.group.position.set(x,measuredGround(x,z),z);p.fig.group.rotation.y=yaw;peers.set(row.id,p);
       }
       if(stamp<p.ts)continue;
       if(p.style!==row.style) {
-        const previous=p.fig.group;removeFigure(p.fig);p.fig=addFigure(row.style==='vest'?'vest':'cardigan');
+        const previous=p.fig.group;removeFigure(p.fig);p.fig=addFigure(row.style==='vest'?'vest':row.style==='honghong'?'honghong':'cardigan');
         p.fig.group.position.copy(previous.position);p.fig.group.rotation.y=previous.rotation.y;p.style=row.style;
       }
       if(p.label.textContent!==row.name)p.label.textContent=String(row.name || '항구 방문자').slice(0,24);
@@ -1084,7 +1084,7 @@ export function mountWalk3D(container, options={}) {
     }
   }
   function setProfile(value) {
-    profile=value || {};const next=profile.style==='vest'?'vest':'cardigan';if(next===style)return;
+    profile=value || {};const next=profile.style==='vest'?'vest':profile.style==='honghong'?'honghong':'cardigan';if(next===style)return;
     removeFigure(local);style=next;local=addFigure(style);local.group.position.copy(player);local.group.rotation.y=heading;updateShadow(local);
   }
   let drops=null;
