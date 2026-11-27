@@ -7,7 +7,7 @@ import { CanvasHarborRenderer } from './canvas-harbor.js';
 import { makeVesselCameraGuard } from './vessel-camera.js';
 import { PALM_CONTACTS, PALM_DURATION, palmPose } from './palm-beats.js';
 import { CHEER_PEAKS, CHEER_DURATION, cheerPose, mountCheers } from './shrine-gesture.js?v=16';
-import { mountTerminalMarquee, TERMINAL_WALL, TERMINAL_WALL_BOUNDS } from './terminal-marquee.js?v=16';
+import { mountTerminalMarquee, TERMINAL_WALL, TERMINAL_WALL_BOUNDS } from './terminal-marquee.js?v=17';
 import { buildDepartureOffice } from './departure-office.js?v=24';
 import { buildHarborLife } from './harbor-life.js?v=18';
 import { buildPortVehicles } from './port-vehicles.js?v=1';
