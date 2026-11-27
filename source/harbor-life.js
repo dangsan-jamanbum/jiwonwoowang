@@ -257,7 +257,7 @@ export function buildHarborLife(T, scene) {
     ellipsoid(animal,'#364c58',s*.436,.175,1.13,.038,.049,.056);
     ellipsoid(animal,'#f7efda',s*.461,.196,1.146,.014,.014,.017);
     ellipsoid(animal,'#3e5961',s*.186,.166,1.74,.016,.012,.021);
-    curve(animal,'#556e71',[[s*.248,.047,1.66],[s*.332,.050,1.49],[s*.392,.067,1.32]],.009,6);
+    const mouth=curve(animal,'#556e71',[[s*.248,.047,1.66],[s*.332,.050,1.49],[s*.392,.067,1.32]],.009,6);mouth.name='북항이 입';
     for(let i=0;i<3;i++){
       const z=.82-i*.111,x=.51+i*.011;
       curve(animal,'#476773',[[s*(x-.026),.212,z],[s*x,.136,z-.035],[s*(x+.01),.060,z-.028]],.011,5);
@@ -292,31 +292,42 @@ export function buildHarborLife(T, scene) {
   const tongue=ellipsoid(animal,'#e85d70',0,-.145,1.895,.105,.052,.16);tongue.name='낼름 나온 혀';tongue.visible=false;
   const babyShark=new T.Group();babyShark.name='엄마를 찾는 아기 상어';group.add(babyShark);
   const babyAnimal=animal.clone(true);babyShark.add(babyAnimal);babyAnimal.scale.setScalar(.38);babyShark.visible=false;
-  ellipsoid(babyAnimal,'#493f49',0,-.11,1.90,.055,.043,.075).name='울먹이는 아기 상어 입';
+  babyAnimal.getObjectByName('북항이 입')?.removeFromParent();
+  babyAnimal.getObjectByName('잡힌 상어의 X 눈').visible=false;
+  babyAnimal.getObjectByName('낼름 나온 혀').visible=false;
+  const babyFace=new T.Group();babyFace.name='눈물과 울상 표정';babyAnimal.add(babyFace);
+  const tearMat=keep(new T.MeshStandardMaterial({color:'#79d9fa',transparent:true,opacity:.78,roughness:.16,metalness:.04,depthWrite:false}));
   const tears=[];
   for(const side of [-1,1]){
-    const tear=ellipsoid(babyAnimal,'#72c9ed',side*.175,.12,1.205,.035,.085,.035);tear.name='아기 상어 눈물';tears.push(tear);
+    const brow=curve(babyFace,'#344d59',[[side*.115,.285,1.145],[side*.175,.315,1.16],[side*.235,.285,1.145]],.014,7);brow.name='슬픈 눈썹';
+    const stream=mesh(babyFace,keep(new T.SphereGeometry(1,12,10)),tearMat,side*.175,.105,1.205);
+    stream.scale.set(.033,.092,.028);stream.name='반투명 하늘색 눈물 줄기';
+    const drop=mesh(babyFace,keep(new T.SphereGeometry(1,12,10)),tearMat,side*.175,.015,1.213);
+    drop.scale.set(.037,.052,.034);drop.name='눈물방울';tears.push(stream,drop);
   }
+  const cryingMouth=curve(babyFace,'#493f49',[[-.085,-.105,1.89],[0,-.055,1.925],[.085,-.105,1.89]],.018,12);
+  cryingMouth.name='아래로 처진 울음 입';
   const dayTransmission=new T.Color('#84acb4'),nightTransmission=new T.Color('#507e91');
-  let sceneTime=0,fishingState='idle',baitAt=0,reelHits=0,plateFilled=false,cookedAt=0,carryParent=null;
-  function setSashimiPlate(full=true,eaten=false){
-    if(eaten){fishingState='eaten';plateFilled=false;sashimiSlices.forEach(v=>v.visible=false);babyShark.visible=true;}
+  let sceneTime=0,fishingState='idle',baitAt=0,reelHits=0,plateFilled=false,cookedAt=0,carryParent=null,selectedDish='',sharedCaught=false;
+  function setSashimiPlate(full=true,eaten=false,caught=false){
+    if(eaten){fishingState='idle';sharedCaught=false;plateFilled=false;sashimiSlices.forEach(v=>v.visible=false);babyShark.visible=false;shark.visible=true;}
+    else if(caught){sharedCaught=true;shark.visible=false;babyShark.visible=true;}
     else if(full){fishingState='cooked';plateFilled=true;fillSashimiPlate();}
-    else if(fishingState==='cooked'){fishingState='eaten';plateFilled=false;sashimiSlices.forEach(v=>v.visible=false);babyShark.visible=true;}
   }
   function fishShark(){
-    if(fishingState==='idle'){fishingState='casting';baitAt=sceneTime+2.0;return 'cast';}
+    if(fishingState==='idle'){if(sharedCaught)return 'busy';fishingState='casting';baitAt=sceneTime+2.0;return 'cast';}
     if(fishingState==='casting')return 'waiting';
     if(fishingState==='bite'){
       reelHits++;
-      if(reelHits>=9){fishingState='caught';xMarks.visible=true;tongue.visible=true;return 'caught';}
+      if(reelHits>=9){fishingState='caught';sharedCaught=true;shark.visible=false;babyShark.visible=true;xMarks.visible=true;tongue.visible=true;return 'caught';}
       return 'reeling';
     }
     if(fishingState==='caught')return 'ready';
     if(fishingState==='carried')return 'carrying';
+    if(fishingState==='menu')return 'menu';
     if(fishingState==='cooking')return 'cooking';
     if(fishingState==='cooked')return 'cooked';
-    if(fishingState==='eaten')return 'eaten';
+    if(fishingState==='eating')return 'eating';
     return 'waiting';
   }
   function pickUpShark(parent){
@@ -327,16 +338,28 @@ export function buildHarborLife(T, scene) {
   }
   function deliverShark(){
     if(fishingState!=='carried')return false;
-    shark.visible=false;carryParent=null;fishingState='cooking';cookedAt=sceneTime+3.8;return true;
+    shark.parent?.remove(shark);group.add(shark);shark.scale.setScalar(1);
+    shark.position.set(-24.8,SEA_LEVEL,30.55);shark.rotation.set(0,0,0);shark.visible=false;
+    carryParent=null;fishingState='menu';babyShark.visible=true;return true;
   }
-  function eatShark(){
+  function chooseSharkDish(dish){
+    if(fishingState!=='menu'||!['steak','soup','sashimi'].includes(dish))return false;
+    selectedDish=dish;fishingState='cooking';cookedAt=sceneTime+3.8;return true;
+  }
+  function beginEatingShark(){
     if(fishingState!=='cooked')return false;
-    fishingState='eaten';plateFilled=false;sashimiSlices.forEach(v=>v.visible=false);
-    babyShark.visible=true;return true;
+    fishingState='eating';return true;
+  }
+  function finishEatingShark(){
+    if(fishingState!=='eating')return false;
+    fishingState='idle';sharedCaught=false;selectedDish='';plateFilled=false;
+    sashimiSlices.forEach(v=>v.visible=false);babyShark.visible=false;shark.visible=true;
+    return true;
   }
   function interactSharkAtStall(){
-    if(fishingState==='carried')return deliverShark()?'delivered':false;
-    if(fishingState==='cooked')return eatShark()?'eaten':false;
+    if(fishingState==='carried')return deliverShark()?'menu':false;
+    if(fishingState==='cooked')return 'eatMenu';
+    if(fishingState==='menu')return 'menu';
     return false;
   }
   function update(time=0,night=0,reduced=false){
@@ -346,7 +369,9 @@ export function buildHarborLife(T, scene) {
     if(fishingState==='bite'){jump=.10+.08*Math.sin(sceneTime*12);baitFloat.position.y=.30+.12*Math.abs(Math.sin(sceneTime*10));}
     else baitFloat.position.y=.30+.025*Math.sin(sceneTime*2.1);
     if(fishingState==='cooking'&&sceneTime>=cookedAt){fishingState='cooked';plateFilled=true;fillSashimiPlate();event='cooked';}
-    if(fishingState==='eaten'){
+    const babyActive=sharedCaught||['caught','carried','menu','cooking','cooked','eating'].includes(fishingState);
+    babyShark.visible=babyActive;
+    if(babyActive){
       babyShark.visible=true;
       babyShark.position.set(-24.8+2.25*Math.sin(sceneTime*.12),SEA_LEVEL+.04,30.55+4.1*Math.cos(sceneTime*.12));
       babyShark.rotation.y=Math.sin(sceneTime*.12)*.24;
@@ -362,7 +387,8 @@ export function buildHarborLife(T, scene) {
     // The west side of the quay is clear from the stall to the new shoreline
     // return. A short patrol keeps both the bow and tail in this open water.
     const a=t*.18+.66,rx=1.48,rz=3.20;
-    if(fishingState!=='carried'&&fishingState!=='cooking'&&fishingState!=='cooked'&&fishingState!=='eaten'){
+    if(fishingState==='idle'&&!sharedCaught){
+      shark.visible=true;
       shark.position.set(-24.8+rx*Math.sin(a),SEA_LEVEL+jump,30.55+rz*Math.cos(a));
       shark.rotation.y=Math.atan2(rx*Math.cos(a),-rz*Math.sin(a));
     }
@@ -378,5 +404,5 @@ export function buildHarborLife(T, scene) {
     return Math.abs(dx*c-dz*s)<.58&&Math.abs(dx*s+dz*c)<.29;
   }
   function dispose(){scene.remove(group);resources.forEach(resource=>resource.dispose());resources.clear();}
-  update();return {group,booth,shark,sharkWatch:SHARK_WATCH,approach:EOMUK_ZONE,blocks,update,fishShark,pickUpShark,interactSharkAtStall,setSashimiPlate,dispose};
+  update();return {group,booth,shark,sharkWatch:SHARK_WATCH,approach:EOMUK_ZONE,blocks,update,fishShark,pickUpShark,interactSharkAtStall,chooseSharkDish,beginEatingShark,finishEatingShark,setSashimiPlate,dispose};
 }
