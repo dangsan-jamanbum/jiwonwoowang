@@ -10,7 +10,7 @@ import { CHEER_PEAKS, CHEER_DURATION, cheerPose, mountCheers } from './shrine-ge
 import { mountTerminalMarquee, TERMINAL_WALL, TERMINAL_WALL_BOUNDS } from './terminal-marquee.js?v=17';
 import { buildDepartureOffice } from './departure-office.js?v=24';
 import { buildHarborLife } from './harbor-life.js?v=19';
-import { buildPortVehicles } from './port-vehicles.js?v=2';
+import { buildPortVehicles } from './port-vehicles.js?v=3';
 
 const { Vector3: V3 } = THREE;
 const clamp = (v, lo, hi) => Math.min(hi,Math.max(lo,v));
@@ -303,6 +303,9 @@ export function mountWalk3D(container, options={}) {
     equipment:new THREE.MeshStandardMaterial({color:0x477c83,metalness:.35,roughness:.62}),
     equipmentMetal:new THREE.MeshStandardMaterial({color:0xb8c3c1,metalness:.72,roughness:.38}),
     beacon:new THREE.MeshStandardMaterial({color:0xe45b42,emissive:0x7d170c,emissiveIntensity:.45}),
+    bomb:new THREE.MeshStandardMaterial({color:0x292d32,metalness:.22,roughness:.55}),
+    bombFuse:new THREE.MeshStandardMaterial({color:0xd9a34b,roughness:.62}),
+    wrench:new THREE.MeshStandardMaterial({color:0xb9c8ca,metalness:.82,roughness:.28}),
     delayAura:new THREE.MeshBasicMaterial({color:0xff2938,transparent:true,opacity:.78,depthWrite:false,side:THREE.DoubleSide}),
     cancelAura:new THREE.MeshBasicMaterial({color:0x35ed83,transparent:true,opacity:.78,depthWrite:false,side:THREE.DoubleSide}),
     delayGlow:new THREE.MeshBasicMaterial({color:0xff2938,transparent:true,opacity:.16,depthWrite:false,side:THREE.DoubleSide}),
@@ -315,7 +318,19 @@ export function mountWalk3D(container, options={}) {
   function makeCargoVisual(item){
     const g=new THREE.Group();g.name='지연 상쇄 현장 지원 모형';
     const kind=item.kind||(/weather|storm|재해|기상/i.test(item.id+' '+item.name)?'weather':/crew|worker|인원|작업/i.test(item.id+' '+item.name)?'crew':'equipment');
-    if(kind==='weather'){
+    if(kind==='bomb'){
+      cargoPart(g,new THREE.SphereGeometry(.39,18,14),cargoMaterials.bomb,0,.43,0,1,1,.94);
+      cargoPart(g,new THREE.TorusGeometry(.395,.045,8,24),cargoMaterials.beacon,0,.43,0,1,1,1);
+      const fuse=cargoPart(g,new THREE.CylinderGeometry(.045,.055,.20,8),cargoMaterials.bombFuse,.12,.83,-.02);
+      fuse.rotation.z=-.48;
+      cargoPart(g,new THREE.SphereGeometry(.075,8,6),cargoMaterials.bombFuse,.17,.94,-.02);
+    }else if(kind==='wrench'){
+      const handle=cargoPart(g,new THREE.CylinderGeometry(.105,.13,.72,10),cargoMaterials.wrench,0,.43,0);
+      handle.rotation.z=Math.PI/4;
+      cargoPart(g,new THREE.TorusGeometry(.19,.065,9,20),cargoMaterials.wrench,-.27,.70,0,1,1,1);
+      cargoPart(g,new THREE.BoxGeometry(.17,.14,.12),cargoMaterials.wrench,-.40,.83,0);
+      cargoPart(g,new THREE.BoxGeometry(.17,.14,.12),cargoMaterials.wrench,-.13,.57,0);
+    }else if(kind==='weather'){
       const cloud=new THREE.Group();g.add(cloud);
       cargoPart(cloud,new THREE.SphereGeometry(.34,14,10),cargoMaterials.cloud,-.25,.65,0,1.12,.82,.92);
       cargoPart(cloud,new THREE.SphereGeometry(.40,14,10),cargoMaterials.cloud,0,.72,0,1.05,.88,1);
@@ -1265,6 +1280,7 @@ export function mountWalk3D(container, options={}) {
     if(['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d','shift'].includes(key)){keys.add(key);e.preventDefault();}
     if((key==='e'||key==='enter')&&!e.repeat&&!gestureLocked()){
       if(carriedCargoId||nearestCargo()){e.preventDefault();e.stopImmediatePropagation();interactCargo();return;}
+      if(near==='shark'){e.preventDefault();e.stopImmediatePropagation();watchShark();return;}
       if(interactNearShrine()){e.preventDefault();}
       else if(near&&!['yard','departure','arrival'].includes(near)){e.preventDefault();options.onZone?.(near);}
     }
