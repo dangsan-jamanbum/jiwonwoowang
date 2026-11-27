@@ -290,7 +290,8 @@ export function buildHarborLife(T, scene) {
   xMarks.visible=false;
   const tongue=ellipsoid(animal,'#e85d70',0,-.145,1.895,.105,.052,.16);tongue.name='낼름 나온 혀';tongue.visible=false;
   const babyShark=new T.Group();babyShark.name='엄마를 찾는 아기 상어';group.add(babyShark);
-  const babyAnimal=animal.clone(true);babyShark.add(babyAnimal);babyAnimal.scale.setScalar(.38);
+  const babyAnimal=animal.clone(true);babyShark.add(babyAnimal);babyAnimal.scale.setScalar(.38);babyShark.visible=false;
+  ellipsoid(babyAnimal,'#493f49',0,-.11,1.90,.055,.043,.075).name='울먹이는 아기 상어 입';
   const tears=[];
   for(const side of [-1,1]){
     const tear=ellipsoid(babyAnimal,'#72c9ed',side*.175,.12,1.205,.035,.085,.035);tear.name='아기 상어 눈물';tears.push(tear);
