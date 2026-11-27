@@ -51,9 +51,13 @@ function makeCargoSpawnPoints(count,starterCount=48){
   return points;
 }
 const cargoBlueprints=[];
-for(let copy=0;copy<15;copy++){
-  for(const [kind,name] of delayCargoTypes)cargoBlueprints.push({effect:'delay',kind,name,copy:copy+1});
-  for(const [kind,name] of cancelCargoTypes)cargoBlueprints.push({effect:'cancel',kind,name,copy:copy+1});
+for(const [index,[kind,name]] of delayCargoTypes.entries()){
+  const copies=index%2===0?8:7;
+  for(let copy=0;copy<copies;copy++)cargoBlueprints.push({effect:'delay',kind,name,copy:copy+1});
+}
+for(const [index,[kind,name]] of cancelCargoTypes.entries()){
+  const copies=index%2===0?8:7;
+  for(let copy=0;copy<copies;copy++)cargoBlueprints.push({effect:'cancel',kind,name,copy:copy+1});
 }
 const cargoSpawns=makeCargoSpawnPoints(cargoBlueprints.length,48);
 const cargoItems=cargoBlueprints.map((item,i)=>({
