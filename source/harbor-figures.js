@@ -276,50 +276,63 @@ function addEomuk(k,holder){
   mesh(holder,geo,'#ffffff');
 }
 
+function dressHonghong(k,chest,coat){
+  const {rings,tube,orb}=k;
+  // A soft, ankle-length thobe with a rounded, gently protruding belly.
+  rings(chest,[[-.735,.255,.174,-.012],[-.700,.285,.190,-.010],[-.560,.310,.207,-.008],[-.360,.342,.232,-.006],[-.150,.382,.258,-.004],[.035,.405,.274,-.002],[.205,.389,.258,0],[.365,.344,.218,0],[.500,.292,.170,0],[.590,.205,.122,0],[.650,.105,.088,0]],coat,0,0,0,40);
+  // A restrained front placket and collar keep the robe readable at game scale.
+  tube(chest,[[0,.605,.128],[0,.485,.179],[0,.300,.254],[0,.080,.274],[0,-.180,.258],[0,-.440,.230],[0,-.680,.190]],.006,'#e7e3dc',24);
+  orb(chest,0,.525,.176,.018,.018,.008,'#d7d1c8');
+  orb(chest,0,.445,.192,.012,.012,.006,'#d7d1c8');
+}
+
 function buildRig(T,style,guardian){
   const k=kit(T),{group,orb,rings,tube,plaque,rect,lock,mesh}=k;
-  const h=style==='honghong', f=style==='cardigan'||h, g=guardian||'';
+  const h=style==='honghong', f=style==='cardigan', g=guardian||'';
   const themes={
     poseidon:{hair:'#365e75',hairLight:'#608697',brow:'#38556a',skin:'#deb18e',coat:'#749ca2'},
     njord:{hair:'#7f7566',hairLight:'#b1a28b',brow:'#766558',skin:'#ddba9e',coat:'#6e8174'},
     yi:{hair:'#333338',hairLight:'#484249',brow:'#383334',skin:'#deb08c',coat:'#56544e'},
     jang:{hair:'#393437',hairLight:'#504347',brow:'#423534',skin:'#e5b592',coat:'#504549'}
   };
-  const theme=themes[g]||(h?{skin:'#efc29f',hair:'#eee9df',hairLight:'#ffffff',brow:'#5b4a42',coat:'#f5f1e8'}:{skin:'#efc29f',hair:f?'#3c3335':'#352e2e',hairLight:f?'#514248':'#51433f',brow:'#4b403d',coat:f?'#91ad97':'#344957'});
+  const theme=themes[g]||(h?{skin:'#e8b995',hair:'#292522',hairLight:'#49403a',brow:'#40332e',coat:'#fffdf8'}:{skin:'#efc29f',hair:f?'#3c3335':'#352e2e',hairLight:f?'#514248':'#51433f',brow:'#4b403d',coat:f?'#91ad97':'#344957'});
   const G=group(null),body=group(G,0,.85,0), chest=group(body),head=group(chest,0,1.003,.017);
-  const skin=theme.skin,shirt='#fffdf7',coat=theme.coat,pants=g?'#515d68':h?'#eee9df':'#495563';
-  const hem=g?'#b3a185':h?'#e6dfd2':f?'#84a48c':'#344b5a';
+  const skin=theme.skin,shirt='#fffdf7',coat=theme.coat,pants=g?'#515d68':h?'#fffdf8':'#495563';
+  const hem=g?'#b3a185':f?'#84a48c':'#344b5a';
   const eyes=g?guardianFace(k,head,theme,g):face(k,head,theme);
   if(!g){
-    hair(k,head,h?'cardigan':style,theme);
     if(h){
-      // Long white hair, red headband marked 홍홍, round glasses; no weapon.
+      // Dark, tidy side hair beneath a soft red-and-white checked ghutra.
+      orb(head,0,.115,-.117,.298,.275,.249,'#292522');
       for(const side of [-1,1]){
-        lock(head,[[side*.285,.20,-.045],[side*.355,-.015,-.12],[side*.365,-.30,-.17],[side*.31,-.58,-.13],[side*.27,-.79,-.06]],.075,.035,'#f8f5ed');
-        lock(head,[[side*.19,.29,-.16],[side*.26,.04,-.29],[side*.25,-.25,-.32],[side*.20,-.53,-.25],[side*.16,-.75,-.17]],.060,.027,'#e5e0d8');
+        lock(head,[[side*.30,.24,.015],[side*.36,.06,.005],[side*.37,-.16,-.025],[side*.32,-.38,-.035]],.105,.045,'#fffdf8');
+        lock(head,[[side*.24,.20,-.12],[side*.29,-.01,-.23],[side*.27,-.23,-.25],[side*.23,-.43,-.17]],.090,.035,'#fffdf8');
+        // Small red woven accents on the hanging scarf edges.
+        tube(head,[[side*.31,.10,.015],[side*.35,-.08,-.005],[side*.35,-.24,-.025]],.009,'#c94a4c',12);
       }
-      const band=group(head,0,.245,.286);
-      rect(band,0,0,0,.59,.075,.025,.018,'#c92332');
-      const ink='#fff5e9';
-      function stroke(points){tube(band,points,.008,ink,12);}
-      function glyph(cx){
-        stroke([[cx-.052,.012,.021],[cx+.052,.012,.021]]);
-        stroke([[cx-.035,.027,.021],[cx+.035,.027,.021]]);
-        stroke([[cx,.026,.021],[cx,.001,.021]]);
-        const circle=mesh(band,new T.TorusGeometry(.018,.006,5,12),ink,cx,-.014,.022);
-      }
-      glyph(-.105);glyph(.105);
+      const crown=mesh(head,new T.SphereGeometry(1,24,16),'#fffdf8',0,.205,-.015);
+      crown.scale.set(.365,.245,.345);
+      // A dark agal sits over the scarf; the red forehead band remains visible.
+      const agal=mesh(head,new T.TorusGeometry(.337,.031,8,40),'#292725',0,.302,-.012);
+      agal.rotation.x=Math.PI/2;agal.scale.set(1,.92,1);
+      const band=group(head,0,.226,.286);
+      rect(band,0,0,0,.625,.084,.026,.018,'#c92535');
+      const canvas=document.createElement('canvas');canvas.width=512;canvas.height=128;
+      const ctx=canvas.getContext('2d');ctx.clearRect(0,0,512,128);
+      ctx.fillStyle='#fff8ef';ctx.font='bold 92px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('홍홍',256,66);
+      const texture=new T.CanvasTexture(canvas);texture.colorSpace=T.SRGBColorSpace;
+      const textMaterial=new T.MeshBasicMaterial({map:texture,transparent:true,side:T.DoubleSide,depthWrite:false});
+      const lettering=mesh(band,new T.PlaneGeometry(.43,.078),textMaterial,0,0,.016);
       for(const side of [-1,1]){
-        const lens=mesh(head,new T.TorusGeometry(.073,.008,5,16),'#493f38',side*.137,-.005,.340);
+        const lens=mesh(head,new T.TorusGeometry(.073,.008,7,20),'#39332f',side*.137,-.005,.340);
         lens.scale.set(1,.82,1);
-        tube(head,[[side*.064,-.004,.342],[side*.018,.002,.348],[-side*.018,.002,.348],[-side*.064,-.004,.342]],.006,'#493f38',10);
-        tube(head,[[side*.208,.018,.315],[side*.30,.032,.245]],.006,'#493f38',8);
+        tube(head,[[side*.064,-.004,.342],[side*.018,.002,.348],[-side*.018,.002,.348],[-side*.064,-.004,.342]],.006,'#39332f',10);
+        tube(head,[[side*.208,.018,.315],[side*.30,.032,.245]],.006,'#39332f',8);
       }
-      tube(chest,[[-.17,.55,.14],[-.10,.39,.18],[.00,.20,.18],[.13,.02,.15]],.018,'#80543a',20);
-    }
+    }else hair(k,head,style,theme);
     // A vertically oriented egg in the front and profile cameras. The heavier
     // lower face follows an actual sculpted surface around both cheeks.
-    head.scale.set(f?.889:.918,1.085,f?.991:1.005);
+    head.scale.set(h?.96:f?.889:.918,h?1.04:1.085,h?1.015:f?.991:1.005);
     head.position.y=1.030;
   }
   rings(chest,[[.55,.076,.078],[.63,.085,.085],[.704,.09,.091]],skin);
@@ -328,7 +341,7 @@ function buildRig(T,style,guardian){
     rings(chest,[[-.072,.216,.124],[-.05,.249,.145],[.015,.257,.155],[.21,.236,.153],[.362,.268,.165],[.46,.285,.160],[.50,.251,.142],[.536,.151,.102],[.55,.088,.083]],coat,0,.10,0);
     rings(chest,[[.026,.242,.145],[.030,.257,.152],[.079,.258,.158],[.091,.253,.155]],hem);
   }else{
-    tailorWorker(k,chest,badge,f,coat,shirt);
+    if(h)dressHonghong(k,chest,coat);else tailorWorker(k,chest,badge,f,coat,shirt);
     rect(badge,0,-.081,0,.120,.142,.012,.014,'#e3dcc8');
     rect(badge,0,-.064,.013,.108,.092,.002,.006,'#fff6df');
     rect(badge,-.020,-.061,.016,.048,.055,.002,.003,'#9cb9b5');
