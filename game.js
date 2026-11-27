@@ -582,7 +582,10 @@ window.addEventListener('keydown',e=>{
  if(dialog.open)return;
  if(!playing||dialogue.isOpen())return;
  if(e.code==='KeyM'){e.preventDefault();openPanel('map');}
- if(e.code==='KeyE'&&(shrineNearby||(nearby&&nearby!=='departure'))){e.preventDefault();interact();}
+ if(e.code==='KeyE'){
+  if(world?.hasCargoInteraction?.()){e.preventDefault();world.interactCargo?.();return;}
+  if(shrineNearby||(nearby&&nearby!=='departure')){e.preventDefault();interact();}
+ }
 });
 if(terminal||!selectedId)primeBoard(terminal||'pnc');
 startWalking();refresh().catch(()=>{});setInterval(()=>{if(!document.hidden&&!pendingRefresh)refresh().catch(()=>{});},5000);
